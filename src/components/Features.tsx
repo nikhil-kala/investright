@@ -1,11 +1,8 @@
 import React from 'react';
 import { Calculator, PieChart, BookOpen, BarChart3, Shield, Zap } from 'lucide-react';
 import { useLanguage } from '../hooks/useLanguage';
-import { useLanguage } from '../hooks/useLanguage';
 
 export default function Features() {
-  const { t } = useLanguage();
-
   const { t } = useLanguage();
 
   const features = [

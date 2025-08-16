@@ -1,11 +1,8 @@
 import React from 'react';
 import { Building, Coins, TrendingUp, Landmark } from 'lucide-react';
 import { useLanguage } from '../hooks/useLanguage';
-import { useLanguage } from '../hooks/useLanguage';
 
 export default function InvestmentOptions() {
-  const { t } = useLanguage();
-
   const { t } = useLanguage();
 
   const options = [

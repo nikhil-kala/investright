@@ -1,11 +1,8 @@
 import React from 'react';
 import { ArrowRight, Shield, Users, TrendingUp } from 'lucide-react';
 import { useLanguage } from '../hooks/useLanguage';
-import { useLanguage } from '../hooks/useLanguage';
 
 export default function Hero() {
-  const { t } = useLanguage();
-
   const { t } = useLanguage();
 
   return (

@@ -1,7 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { MessageCircle, X, Send, Bot, User } from 'lucide-react';
 import { useLanguage } from '../hooks/useLanguage';
-import { useLanguage } from '../hooks/useLanguage';
 
 interface Message {
   id: string;
@@ -11,8 +10,6 @@ interface Message {
 }
 
 export default function Chatbot() {
-  const { t } = useLanguage();
-
   const { t } = useLanguage();
 
   const [isOpen, setIsOpen] = useState(false);

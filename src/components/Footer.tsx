@@ -1,11 +1,8 @@
 import React from 'react';
 import { TrendingUp, Mail, Phone, MapPin } from 'lucide-react';
 import { useLanguage } from '../hooks/useLanguage';
-import { useLanguage } from '../hooks/useLanguage';
 
 export default function Footer() {
-  const { t } = useLanguage();
-
   const { t } = useLanguage();
 
   return (

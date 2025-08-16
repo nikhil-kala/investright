@@ -1,11 +1,8 @@
 import React from 'react';
 import { Users, Award, Target, Heart } from 'lucide-react';
 import { useLanguage } from '../hooks/useLanguage';
-import { useLanguage } from '../hooks/useLanguage';
 
 export default function About() {
-  const { t } = useLanguage();
-
   const { t } = useLanguage();
 
   return (
