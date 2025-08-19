@@ -483,186 +483,208 @@ export default function Chatbot({ openChat = false, conversationId }: ChatbotPro
         )}
       </div>
 
-      {/* Chatbot Interface */}
-      {isOpen && (
-        <div className="fixed bottom-6 right-6 z-50 w-96 h-[500px] bg-white rounded-2xl shadow-2xl border border-gray-200 flex flex-col">
-          {/* Header */}
-          <div className="bg-blue-600 text-white p-4 rounded-t-2xl flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              <div className="bg-white bg-opacity-20 p-2 rounded-lg">
-                <Bot className="h-5 w-5" />
-              </div>
-              <div>
-                <h3 className="font-semibold">{t.chatbot.title}</h3>
-                <p className="text-sm text-blue-100">{t.chatbot.subtitle}</p>
-              </div>
-            </div>
-            <div className="flex items-center space-x-2">
-              <button
-                onClick={() => setShowEmailPopup(true)}
-                className={`p-2 rounded-lg transition-colors ${
-                  emailSubmitted 
-                    ? 'bg-green-500 hover:bg-green-600 text-white' 
-                    : 'bg-white bg-opacity-20 hover:bg-opacity-30 text-white'
-                }`}
-                title={emailSubmitted ? 'Email registered - Click to update' : 'Send transcript to email'}
-              >
-                <Mail className="h-4 w-4" />
-              </button>
-              <button
-                onClick={handleCloseChat}
-                className="text-white hover:text-blue-100 transition-colors"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-          </div>
-
-          {/* Messages */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-4">
-            {emailSubmitted && (
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
-                    <Mail className="h-4 w-4 text-blue-600" />
-                    <span className="text-sm text-blue-800">
-                      Transcripts will be sent to: <span className="font-medium">{userFirstName} {userLastName}</span> at <span className="font-medium">{userEmail}</span>
-                    </span>
-                  </div>
-                  <button
-                    onClick={() => setShowEmailPopup(true)}
-                    className="text-xs text-blue-600 hover:text-blue-800 underline"
-                  >
-                    Change
-                  </button>
-                </div>
-              </div>
-            )}
-            
-                               {messages.length > 1 && !emailSubmitted && (
-                     <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-4 mb-4">
-                       <div className="flex items-center justify-between">
-                         <div className="flex items-center space-x-3">
-                           <div className="bg-blue-100 p-2 rounded-full">
-                             <Mail className="h-4 w-4 text-blue-600" />
-                           </div>
-                           <div>
-                             <p className="text-sm font-medium text-blue-900">
-                               Save This Conversation
-                             </p>
-                             <p className="text-xs text-blue-700">
-                               {isAuthenticated 
-                                 ? 'Get a complete transcript sent to your email'
-                                 : 'Create an account to save and access this conversation anytime'
-                               }
-                             </p>
+                     {/* Chatbot Interface */}
+               {isOpen && (
+                 <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-2">
+                   <div className="bg-white rounded-2xl shadow-2xl w-full h-full max-w-none flex flex-col">
+                     {/* Header */}
+                     <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white p-6 rounded-t-2xl flex items-center justify-between border-b border-blue-500">
+                       <div className="flex items-center space-x-4">
+                         <div className="bg-white bg-opacity-20 p-3 rounded-xl">
+                           {/* InvestRight Logo */}
+                           <div className="relative">
+                             <div className="w-8 h-8 flex items-center justify-center">
+                               <div className="relative">
+                                 {/* Upward trending line */}
+                                 <svg className="w-6 h-6 text-white" viewBox="0 0 24 24" fill="none">
+                                   <path 
+                                     d="M3 18L9 12L15 16L21 6" 
+                                     stroke="currentColor" 
+                                     strokeWidth="2.5" 
+                                     strokeLinecap="round" 
+                                     strokeLinejoin="round"
+                                   />
+                                 </svg>
+                                 {/* Green circle at peak */}
+                                 <div className="absolute -top-1 -right-1 w-2 h-2 bg-green-500 rounded-full"></div>
+                                 {/* Green arrow above */}
+                                 <div className="absolute -top-2.5 -right-1 w-0 h-0 border-l-2 border-r-2 border-b-3 border-l-transparent border-r-transparent border-b-green-500"></div>
+                               </div>
+                             </div>
                            </div>
                          </div>
+                         <div>
+                           <h3 className="text-xl font-bold">{t.chatbot.title}</h3>
+                           <p className="text-blue-100">{t.chatbot.subtitle}</p>
+                         </div>
+                       </div>
+                       <div className="flex items-center space-x-3">
                          <button
-                           onClick={handleSaveToAccount}
-                           className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium shadow-sm"
+                           onClick={() => setShowEmailPopup(true)}
+                           className={`p-3 rounded-xl transition-all duration-200 ${
+                             emailSubmitted
+                               ? 'bg-green-500 hover:bg-green-600 text-white shadow-lg'
+                               : 'bg-white bg-opacity-20 hover:bg-opacity-30 text-white hover:scale-105'
+                           }`}
+                           title={emailSubmitted ? 'Email registered - Click to update' : 'Send transcript to email'}
                          >
-                           {isAuthenticated ? 'Send Transcript' : 'Save to Account'}
+                           <Mail className="h-5 w-5" />
+                         </button>
+                         <button
+                           onClick={handleCloseChat}
+                           className="text-white hover:text-blue-100 transition-colors p-2 hover:bg-white hover:bg-opacity-20 rounded-lg"
+                         >
+                           <X className="h-6 w-6" />
                          </button>
                        </div>
                      </div>
-                   )}
-            
-            {messages.map((message) => (
-              <div
-                key={message.id}
-                className={`flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'}`}
-              >
-                <div
-                  className={`max-w-[80%] p-3 rounded-lg ${
-                    message.sender === 'user'
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-gray-100 text-gray-900'
-                  }`}
-                >
-                  <p className="text-sm">{message.text}</p>
-                  <p className={`text-xs mt-1 ${
-                    message.sender === 'user' ? 'text-blue-100' : 'text-gray-500'
-                  }`}>
-                    {message.timestamp.toLocaleTimeString()}
-                  </p>
-                </div>
-              </div>
-            ))}
-            
-                               {/* Info message about transcript feature */}
-                   {messages.length === 1 && (
-                     <div className="flex justify-start">
-                       <div className="bg-blue-50 border border-blue-200 p-3 rounded-lg max-w-[80%]">
-                         <p className="text-sm text-blue-800">
-                           💡 <strong>Tip:</strong> After our conversation, you can save it to your account or get a transcript sent to your email for future reference.
-                         </p>
+
+                               {/* Messages */}
+                     <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-gray-50">
+                       {emailSubmitted && (
+                         <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6">
+                           <div className="flex items-center justify-between">
+                             <div className="flex items-center space-x-3">
+                               <Mail className="h-5 w-5 text-blue-600" />
+                               <span className="text-sm text-blue-800">
+                                 Transcripts will be sent to: <span className="font-medium">{userFirstName} {userLastName}</span> at <span className="font-medium">{userEmail}</span>
+                               </span>
+                             </div>
+                             <button
+                               onClick={() => setShowEmailPopup(true)}
+                               className="text-sm text-blue-600 hover:text-blue-800 underline font-medium"
+                             >
+                               Change
+                             </button>
+                           </div>
+                         </div>
+                       )}
+
+                       {messages.length > 1 && !emailSubmitted && (
+                         <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-5 mb-6">
+                           <div className="flex items-center justify-between">
+                             <div className="flex items-center space-x-4">
+                               <div className="bg-blue-100 p-3 rounded-full">
+                                 <Mail className="h-5 w-5 text-blue-600" />
+                               </div>
+                               <div>
+                                 <p className="text-sm font-semibold text-blue-900">
+                                   Save This Conversation
+                                 </p>
+                                 <p className="text-sm text-blue-700">
+                                   {isAuthenticated
+                                     ? 'Get a complete transcript sent to your email'
+                                     : 'Create an account to save and access this conversation anytime'
+                                   }
+                                 </p>
+                               </div>
+                             </div>
+                             <button
+                               onClick={handleSaveToAccount}
+                               className="bg-blue-600 text-white px-5 py-3 rounded-xl hover:bg-blue-700 transition-all duration-200 text-sm font-medium shadow-lg hover:shadow-xl"
+                             >
+                               {isAuthenticated ? 'Send Transcript' : 'Save to Account'}
+                             </button>
+                           </div>
+                         </div>
+                       )}
+
+                       {messages.map((message) => (
+                         <div
+                           key={message.id}
+                           className={`flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'}`}
+                         >
+                           <div
+                             className={`max-w-[70%] p-4 rounded-2xl shadow-sm ${
+                               message.sender === 'user'
+                                 ? 'bg-blue-600 text-white'
+                                 : 'bg-white text-gray-900 border border-gray-200'
+                             }`}
+                           >
+                             <p className="text-sm leading-relaxed">{message.text}</p>
+                             <p className={`text-xs mt-2 ${
+                               message.sender === 'user' ? 'text-blue-100' : 'text-gray-500'
+                             }`}>
+                               {message.timestamp.toLocaleTimeString()}
+                             </p>
+                           </div>
+                         </div>
+                       ))}
+
+                       {/* Info message about transcript feature */}
+                       {messages.length === 1 && (
+                         <div className="flex justify-start">
+                           <div className="bg-blue-50 border border-blue-200 p-4 rounded-xl max-w-[70%]">
+                             <p className="text-sm text-blue-800 leading-relaxed">
+                               💡 <strong>Tip:</strong> After our conversation, you can save it to your account or get a transcript sent to your email for future reference.
+                             </p>
+                           </div>
+                         </div>
+                       )}
+
+                       {isTyping && (
+                         <div className="flex justify-start">
+                           <div className="bg-white border border-gray-200 p-4 rounded-2xl shadow-sm">
+                             <div className="flex space-x-2">
+                               <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
+                               <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                               <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                             </div>
+                           </div>
+                         </div>
+                       )}
+
+                       <div ref={messagesEndRef} />
+                     </div>
+
+                               {/* Input */}
+                     <div className="p-6 border-t border-gray-200 bg-white">
+                       {/* Send Transcript Button */}
+                       {messages.length > 1 && (
+                         <div className="mb-4 flex justify-center">
+                           <button
+                             onClick={handleSaveToAccount}
+                             className={`flex items-center space-x-3 px-6 py-3 rounded-xl transition-all duration-200 text-sm font-medium shadow-lg hover:shadow-xl ${
+                               emailSubmitted
+                                 ? 'bg-green-600 text-white hover:bg-green-700'
+                                 : 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:from-blue-700 hover:to-indigo-700'
+                             }`}
+                           >
+                             <Mail className="h-5 w-5" />
+                             <span>
+                               {emailSubmitted
+                                 ? 'Update Email'
+                                 : isAuthenticated
+                                   ? 'Send Transcript to Email'
+                                   : 'Save to Account'
+                               }
+                             </span>
+                           </button>
+                         </div>
+                       )}
+
+                       <div className="flex space-x-3">
+                         <input
+                           type="text"
+                           value={inputValue}
+                           onChange={(e) => setInputValue(e.target.value)}
+                           onKeyPress={handleKeyPress}
+                           placeholder={isTyping ? "AI is typing..." : t.chatbot.placeholder}
+                           disabled={isTyping}
+                           className="flex-1 px-5 py-4 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50 text-sm"
+                         />
+                         <button
+                           onClick={handleSendMessage}
+                           disabled={!inputValue.trim() || isTyping}
+                           className="bg-blue-600 text-white p-4 rounded-xl hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-lg hover:shadow-xl"
+                         >
+                           <Send className="h-5 w-5" />
+                         </button>
                        </div>
                      </div>
-                   )}
-            
-            {isTyping && (
-              <div className="flex justify-start">
-                <div className="bg-gray-100 text-gray-900 p-3 rounded-lg">
-                  <div className="flex space-x-1">
-                    <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
-                    <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                    <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
-                  </div>
-                </div>
-              </div>
-            )}
-            
-            <div ref={messagesEndRef} />
-          </div>
-
-          {/* Input */}
-          <div className="p-4 border-t border-gray-200">
-                               {/* Send Transcript Button */}
-                   {messages.length > 1 && (
-                     <div className="mb-3 flex justify-center">
-                       <button
-                         onClick={handleSaveToAccount}
-                         className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-all duration-200 text-sm font-medium shadow-sm ${
-                           emailSubmitted 
-                             ? 'bg-green-600 text-white hover:bg-green-700 hover:shadow-md' 
-                             : 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:from-blue-700 hover:to-indigo-700 hover:shadow-md'
-                         }`}
-                       >
-                         <Mail className="h-4 w-4" />
-                         <span>
-                           {emailSubmitted 
-                             ? 'Update Email' 
-                             : isAuthenticated 
-                               ? 'Send Transcript to Email' 
-                               : 'Save to Account'
-                           }
-                         </span>
-                       </button>
-                     </div>
-                   )}
-            
-            <div className="flex space-x-2">
-              <input
-                type="text"
-                value={inputValue}
-                onChange={(e) => setInputValue(e.target.value)}
-                onKeyPress={handleKeyPress}
-                placeholder={isTyping ? "AI is typing..." : t.chatbot.placeholder}
-                disabled={isTyping}
-                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50"
-              />
-              <button
-                onClick={handleSendMessage}
-                disabled={!inputValue.trim() || isTyping}
-                className="bg-blue-600 text-white p-2 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                <Send className="h-5 w-5" />
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </>
-  );
-}
+                   </div>
+                 </div>
+               )}
+             </>
+           );
+         }

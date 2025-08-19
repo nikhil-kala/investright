@@ -10,11 +10,33 @@ export default function Footer() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           <div className="md:col-span-2">
-            <div className="flex items-center space-x-2 mb-6">
-              <div className="bg-blue-700 p-2 rounded-lg">
-                <TrendingUp className="h-6 w-6 text-white" />
+            <div className="flex items-center space-x-3 mb-6">
+              {/* InvestRight Logo */}
+              <div className="relative">
+                <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-blue-800 rounded-lg flex items-center justify-center">
+                  <div className="relative">
+                    {/* Upward trending line */}
+                    <svg className="w-6 h-6 text-white" viewBox="0 0 24 24" fill="none">
+                      <path 
+                        d="M3 18L9 12L15 16L21 6" 
+                        stroke="currentColor" 
+                        strokeWidth="2.5" 
+                        strokeLinecap="round" 
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                    {/* Green circle at peak */}
+                    <div className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-green-500 rounded-full"></div>
+                    {/* Green arrow above */}
+                    <div className="absolute -top-3 -right-1 w-0 h-0 border-l-2 border-r-2 border-b-4 border-l-transparent border-r-transparent border-b-green-500"></div>
+                  </div>
+                </div>
               </div>
-              <span className="text-2xl font-bold">{t.header.brand}</span>
+              {/* Company Name */}
+              <div className="flex flex-col">
+                <span className="text-xl font-bold text-blue-400">Invest</span>
+                <span className="text-xl font-bold text-green-400 -mt-1">Right</span>
+              </div>
             </div>
             <p className="text-gray-300 mb-6 max-w-md leading-relaxed">
               {t.footer.description}
@@ -28,12 +50,11 @@ export default function Footer() {
           </div>
 
           <div>
-            <h4 className="font-semibold mb-6">{t.footer.support}</h4>
-            <ul className="space-y-3 text-gray-300">
-              <li><a href="#" className="hover:text-white transition-colors">{t.footer.helpCenter}</a></li>
-              <li><a href="#" className="hover:text-white transition-colors">{t.footer.contact}</a></li>
-              <li><a href="#" className="hover:text-white transition-colors">{t.footer.privacy}</a></li>
-              <li><a href="#" className="hover:text-white transition-colors">{t.footer.terms}</a></li>
+            <ul className="flex gap-8 text-gray-300">
+              <li><a href="#" className="hover:text-white transition-colors whitespace-nowrap">{t.footer.helpCenter}</a></li>
+              <li><a href="#" className="hover:text-white transition-colors whitespace-nowrap">{t.footer.contact}</a></li>
+              <li><a href="#" className="hover:text-white transition-colors whitespace-nowrap">{t.footer.privacy}</a></li>
+              <li><a href="#" className="hover:text-white transition-colors whitespace-nowrap">{t.footer.terms}</a></li>
             </ul>
           </div>
         </div>

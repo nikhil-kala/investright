@@ -11,6 +11,7 @@ export default function Dashboard() {
   const [isLoading, setIsLoading] = useState(true);
   const [chatConversations, setChatConversations] = useState<any[]>([]);
   const [isLoadingChats, setIsLoadingChats] = useState(false);
+  const [totalUsers, setTotalUsers] = useState(0);
 
   useEffect(() => {
     // Check if user is authenticated
@@ -24,6 +25,11 @@ export default function Dashboard() {
     if (user) {
       setCurrentUser(user);
       loadChatConversations(user);
+      
+      // Count total users if admin
+      if (user.role === 'admin') {
+        setTotalUsers(countTotalUsers());
+      }
     }
     setIsLoading(false);
   }, [navigate]);
@@ -70,6 +76,31 @@ export default function Dashboard() {
     }
   };
 
+  const countTotalUsers = () => {
+    let count = 0;
+    try {
+      // Count users from localStorage
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith('user_')) {
+          count++;
+        }
+      }
+      
+      // Also count from the general users array if it exists
+      const users = localStorage.getItem('users');
+      if (users) {
+        const parsedUsers = JSON.parse(users);
+        if (Array.isArray(parsedUsers)) {
+          count = Math.max(count, parsedUsers.length);
+        }
+      }
+    } catch (error) {
+      console.error('Error counting users:', error);
+    }
+    return count;
+  };
+
   const handleLogout = async () => {
     const result = await authService.logout();
     if (result.success) {
@@ -99,8 +130,33 @@ export default function Dashboard() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center space-x-4">
-              <div className="bg-blue-600 p-2 rounded-lg">
-                <Shield className="h-6 w-6 text-white" />
+              <div className="flex items-center space-x-3">
+                {/* InvestRight Logo */}
+                <div className="relative">
+                  <div className="w-8 h-8 bg-gradient-to-br from-blue-600 to-blue-800 rounded-lg flex items-center justify-center">
+                    <div className="relative">
+                      {/* Upward trending line */}
+                      <svg className="w-5 h-5 text-white" viewBox="0 0 24 24" fill="none">
+                        <path 
+                          d="M3 18L9 12L15 16L21 6" 
+                          stroke="currentColor" 
+                          strokeWidth="2.5" 
+                          strokeLinecap="round" 
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                      {/* Green circle at peak */}
+                      <div className="absolute -top-1 -right-1 w-2 h-2 bg-green-500 rounded-full"></div>
+                      {/* Green arrow above */}
+                      <div className="absolute -top-2.5 -right-1 w-0 h-0 border-l-2 border-r-2 border-b-3 border-l-transparent border-r-transparent border-b-green-500"></div>
+                    </div>
+                  </div>
+                </div>
+                {/* Company Name */}
+                <div className="flex flex-col">
+                  <span className="text-lg font-bold text-blue-700">Invest</span>
+                  <span className="text-lg font-bold text-green-600 -mt-1">Right</span>
+                </div>
               </div>
               <h1 className="text-xl font-semibold text-gray-900">Dashboard</h1>
             </div>
@@ -139,13 +195,28 @@ export default function Dashboard() {
               </p>
             </div>
             <div className="bg-white bg-opacity-20 p-3 rounded-xl">
-              <Shield className="h-8 w-8" />
+              <div className="relative">
+                {/* Upward trending line */}
+                <svg className="w-8 h-8 text-white" viewBox="0 0 24 24" fill="none">
+                  <path 
+                    d="M3 18L9 12L15 16L21 6" 
+                    stroke="currentColor" 
+                    strokeWidth="2.5" 
+                    strokeLinecap="round" 
+                    strokeLinejoin="round"
+                  />
+                </svg>
+                {/* Green circle at peak */}
+                <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full"></div>
+                {/* Green arrow above */}
+                <div className="absolute -top-4 -right-1 w-0 h-0 border-l-3 border-r-3 border-b-5 border-l-transparent border-r-transparent border-b-green-500"></div>
+              </div>
             </div>
           </div>
         </div>
 
         {/* Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
           <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
             <div className="flex items-center justify-between">
               <div>
@@ -204,6 +275,21 @@ export default function Dashboard() {
               </div>
             </div>
           </div>
+
+          {/* Total Users - Only show for admin */}
+          {currentUser.role === 'admin' && (
+            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-600">Total Users</p>
+                  <p className="text-2xl font-bold text-gray-900">{totalUsers}</p>
+                </div>
+                <div className="p-2 rounded-lg bg-indigo-100 text-indigo-600">
+                  <Users className="h-5 w-5" />
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Chat Conversations */}

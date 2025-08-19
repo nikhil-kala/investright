@@ -165,8 +165,33 @@ export default function Profile() {
               >
                 ← Back to Dashboard
               </button>
-              <div className="bg-blue-600 p-2 rounded-lg">
-                <User className="h-6 w-6 text-white" />
+              <div className="flex items-center space-x-3">
+                {/* InvestRight Logo */}
+                <div className="relative">
+                  <div className="w-8 h-8 bg-gradient-to-br from-blue-600 to-blue-800 rounded-lg flex items-center justify-center">
+                    <div className="relative">
+                      {/* Upward trending line */}
+                      <svg className="w-5 h-5 text-white" viewBox="0 0 24 24" fill="none">
+                        <path 
+                          d="M3 18L9 12L15 16L21 6" 
+                          stroke="currentColor" 
+                          strokeWidth="2.5" 
+                          strokeLinecap="round" 
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                      {/* Green circle at peak */}
+                      <div className="absolute -top-1 -right-1 w-2 h-2 bg-green-500 rounded-full"></div>
+                      {/* Green arrow above */}
+                      <div className="absolute -top-2.5 -right-1 w-0 h-0 border-l-2 border-r-2 border-b-3 border-l-transparent border-r-transparent border-b-green-500"></div>
+                    </div>
+                  </div>
+                </div>
+                {/* Company Name */}
+                <div className="flex flex-col">
+                  <span className="text-lg font-bold text-blue-700">Invest</span>
+                  <span className="text-lg font-bold text-green-600 -mt-1">Right</span>
+                </div>
               </div>
               <h1 className="text-xl font-semibold text-gray-900">Profile Settings</h1>
             </div>

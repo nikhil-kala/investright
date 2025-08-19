@@ -33,10 +33,37 @@ export default function Header() {
         <div className="flex justify-between items-center py-4">
           <div className="flex items-center space-x-2">
             <Link to="/" className="flex items-center space-x-2">
-              <div className="bg-blue-700 p-2 rounded-lg">
-                <TrendingUp className="h-6 w-6 text-white" />
+              <div className="flex items-center space-x-3">
+                {/* InvestRight Logo */}
+                <div className="flex items-center space-x-2">
+                  {/* Graphic Symbol */}
+                  <div className="relative">
+                    <div className="w-8 h-8 bg-gradient-to-br from-blue-600 to-blue-800 rounded-lg flex items-center justify-center">
+                      <div className="relative">
+                        {/* Upward trending line */}
+                        <svg className="w-6 h-6 text-white" viewBox="0 0 24 24" fill="none">
+                          <path 
+                            d="M3 18L9 12L15 16L21 6" 
+                            stroke="currentColor" 
+                            strokeWidth="2.5" 
+                            strokeLinecap="round" 
+                            strokeLinejoin="round"
+                          />
+                        </svg>
+                        {/* Green circle at peak */}
+                        <div className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-green-500 rounded-full"></div>
+                        {/* Green arrow above */}
+                        <div className="absolute -top-3 -right-1 w-0 h-0 border-l-2 border-r-2 border-b-4 border-l-transparent border-r-transparent border-b-green-500"></div>
+                      </div>
+                    </div>
+                  </div>
+                  {/* Company Name */}
+                  <div className="flex flex-col">
+                    <span className="text-xl font-bold text-blue-700">Invest</span>
+                    <span className="text-xl font-bold text-green-600 -mt-1">Right</span>
+                  </div>
+                </div>
               </div>
-              <span className="text-2xl font-bold text-gray-900">{t.header.brand}</span>
             </Link>
           </div>
 

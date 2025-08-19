@@ -11,6 +11,35 @@ const OurStory: React.FC = () => {
       {/* Hero Section */}
       <div className="bg-gradient-to-br from-blue-50 to-indigo-100 py-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+          {/* InvestRight Logo */}
+          <div className="flex items-center justify-center space-x-4 mb-8">
+            <div className="relative">
+              <div className="w-20 h-20 bg-gradient-to-br from-blue-600 to-blue-800 rounded-2xl flex items-center justify-center">
+                <div className="relative">
+                  {/* Upward trending line */}
+                  <svg className="w-12 h-12 text-white" viewBox="0 0 24 24" fill="none">
+                    <path 
+                      d="M3 18L9 12L15 16L21 6" 
+                      stroke="currentColor" 
+                      strokeWidth="2.5" 
+                      strokeLinecap="round" 
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                  {/* Green circle at peak */}
+                  <div className="absolute -top-1 -right-1 w-4 h-4 bg-green-500 rounded-full"></div>
+                  {/* Green arrow above */}
+                  <div className="absolute -top-5 -right-1 w-0 h-0 border-l-4 border-r-4 border-b-6 border-l-transparent border-r-transparent border-b-green-500"></div>
+                </div>
+              </div>
+            </div>
+            {/* Company Name */}
+            <div className="flex flex-col">
+              <span className="text-4xl font-bold text-blue-700">Invest</span>
+              <span className="text-4xl font-bold text-green-600 -mt-2">Right</span>
+            </div>
+          </div>
+          
           <h1 className="text-5xl font-bold text-gray-900 mb-6">
             {t.ourStory?.title || 'Our Story'}
           </h1>

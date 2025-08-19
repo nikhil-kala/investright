@@ -3,7 +3,7 @@ import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-route
 import Header from './components/Header'
 import Hero from './components/Hero'
 import Features from './components/Features'
-import InvestmentOptions from './components/InvestmentOptions'
+
 import About from './components/About'
 import Footer from './components/Footer'
 import Chatbot from './components/Chatbot'
@@ -24,7 +24,6 @@ function HomePage() {
       <Header />
       <Hero />
       <Features />
-      <InvestmentOptions />
       <About />
       <Footer />
       <Chatbot openChat={location.state?.openChat} conversationId={location.state?.conversationId} />

@@ -84,7 +84,7 @@ export const translations: Record<string, LanguageContent> = {
     about: {
       title: "Empowering Small Investors Since Day One",
       description: "Invest Right was built with a simple mission: make professional-grade investing accessible to everyone, regardless of their portfolio size. We believe smart investing shouldn't be limited to the wealthy.",
-      activeInvestors: "Active Investors",
+              activeInvestors: "Investors Served",
       assetsUnderManagement: "Assets Under Management",
       averageFee: "Average Fee",
       userRating: "User Rating",
@@ -121,12 +121,12 @@ export const translations: Record<string, LanguageContent> = {
       copyright: "© 2025 Invest Right. All rights reserved. Securities offered through registered broker-dealers."
     },
     chatbot: {
-      title: "AI Investment Advisor",
+              title: "InvestRight Advisor",
       subtitle: "Your personal investment guide",
       status: "Online",
       placeholder: "Ask about investment planning...",
       buttonText: "Chat with AI Advisor",
-      welcomeMessage: "Hello! I'm your AI investment advisor. How can I help you with your investment planning today?",
+              welcomeMessage: "Hello! I'm your InvestRight investment advisor. How can I help you with your investment planning today?",
       responses: [
         "That's a great question about investment planning! Based on your situation, I'd recommend starting with a diversified portfolio that includes both stocks and bonds.",
         "For small investors, index funds are often an excellent choice due to their low fees and built-in diversification. What's your investment timeline?",
