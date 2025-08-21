@@ -64,6 +64,17 @@ function OurStoryPage() {
   )
 }
 
+function SignupPage() {
+  console.log('SignupPage component rendering...')
+  return (
+    <div className="min-h-screen bg-white">
+      <Header />
+      <Signup />
+      <Footer />
+    </div>
+  )
+}
+
 function App() {
   console.log('App component rendering...')
   return (
@@ -89,7 +100,7 @@ function App() {
             </ProtectedRoute>
           } 
         />
-        <Route path="/signup" element={<Signup />} />
+        <Route path="/signup" element={<SignupPage />} />
       </Routes>
     </Router>
   )

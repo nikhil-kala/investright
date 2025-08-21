@@ -91,36 +91,7 @@ export default function Login() {
         <div className="bg-white py-8 px-4 shadow-xl rounded-lg sm:px-10">
           {/* Header */}
                              <div className="text-center mb-8">
-                     <div className="mx-auto mb-4">
-                       {/* InvestRight Logo */}
-                       <div className="flex items-center justify-center space-x-3 mb-4">
-                         <div className="relative">
-                           <div className="w-16 h-16 bg-gradient-to-br from-blue-600 to-blue-800 rounded-2xl flex items-center justify-center">
-                             <div className="relative">
-                               {/* Upward trending line */}
-                               <svg className="w-10 h-10 text-white" viewBox="0 0 24 24" fill="none">
-                                 <path 
-                                   d="M3 18L9 12L15 16L21 6" 
-                                   stroke="currentColor" 
-                                   strokeWidth="2.5" 
-                                   strokeLinecap="round" 
-                                   strokeLinejoin="round"
-                                 />
-                               </svg>
-                               {/* Green circle at peak */}
-                               <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full"></div>
-                               {/* Green arrow above */}
-                               <div className="absolute -top-4 -right-1 w-0 h-0 border-l-3 border-r-3 border-b-5 border-l-transparent border-r-transparent border-b-green-500"></div>
-                             </div>
-                           </div>
-                         </div>
-                         {/* Company Name */}
-                         <div className="flex flex-col">
-                           <span className="text-2xl font-bold text-blue-700">Invest</span>
-                           <span className="text-2xl font-bold text-green-600 -mt-1">Right</span>
-                         </div>
-                       </div>
-                     </div>
+
                      <h2 className="text-3xl font-bold text-gray-900 mb-2">
                        Welcome Back
                      </h2>
@@ -129,17 +100,7 @@ export default function Login() {
                      </p>
                    </div>
 
-          {/* Demo Account Info */}
-          <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-            <div className="flex items-center space-x-2 mb-2">
-              <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-              <span className="text-sm font-medium text-blue-900">Demo Account System</span>
-            </div>
-            <p className="text-xs text-blue-700">
-              If you created an account using the signup form, use those exact credentials to log in. 
-              The system supports both demo accounts (localStorage) and Supabase accounts.
-            </p>
-          </div>
+
 
           {/* Success Message */}
           {message && (

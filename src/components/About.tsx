@@ -5,6 +5,7 @@ import { useLanguage } from '../hooks/useLanguage';
 export default function About() {
   const { t } = useLanguage();
   const [totalChats, setTotalChats] = useState(0);
+  const [totalLifeGoalAmount, setTotalLifeGoalAmount] = useState(0);
 
   // Function to count all chat conversations from localStorage
   const countAllChatConversations = () => {
@@ -48,18 +49,131 @@ export default function About() {
     return totalCount;
   };
 
-  useEffect(() => {
-    // Count conversations on component mount
-    setTotalChats(countAllChatConversations());
+  // Function to calculate total life goal amounts from chat conversations
+  const calculateTotalLifeGoalAmounts = () => {
+    let totalAmount = 0;
     
-    // Set up interval to update count every 30 seconds
+    try {
+      // Extract amounts from all chat conversations
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith('chat_conversations_')) {
+          const conversations = localStorage.getItem(key);
+          if (conversations) {
+            const parsedConversations = JSON.parse(conversations);
+            if (Array.isArray(parsedConversations)) {
+              parsedConversations.forEach(conversation => {
+                if (conversation.messages && Array.isArray(conversation.messages)) {
+                  conversation.messages.forEach((message: any) => {
+                    if (message.role === 'user') {
+                      // Look for amounts in user messages (e.g., "I need 50 lakhs", "goal is 2 crore")
+                      const amountMatches = message.content.match(/(\d+(?:\.\d+)?)\s*(lakh|lakhs|crore|crores|cr|cr\+|lakh\+|lakhs\+)/gi);
+                      if (amountMatches) {
+                        amountMatches.forEach((match: string) => {
+                          const [number, unit] = match.toLowerCase().split(/\s+/);
+                          const numValue = parseFloat(number);
+                          if (!isNaN(numValue)) {
+                            if (unit.includes('lakh')) {
+                              totalAmount += numValue * 0.01; // Convert lakhs to crores
+                            } else if (unit.includes('crore') || unit.includes('cr')) {
+                              totalAmount += numValue;
+                            }
+                          }
+                        });
+                      }
+                      
+                      // Also look for amounts in numbers followed by "CR" or "crore"
+                      const crMatches = message.content.match(/(\d+(?:\.\d+)?)\s*(?:CR|cr|crore|crores)/gi);
+                      if (crMatches) {
+                        crMatches.forEach((match: string) => {
+                          const number = match.toLowerCase().replace(/\s*(?:cr|crore|crores)/i, '');
+                          const numValue = parseFloat(number);
+                          if (!isNaN(numValue)) {
+                            totalAmount += numValue;
+                          }
+                        });
+                      }
+                    }
+                  });
+                }
+              });
+            }
+          }
+        }
+      }
+      
+      // Also check from the general users array if it exists
+      const users = localStorage.getItem('users');
+      if (users) {
+        const parsedUsers = JSON.parse(users);
+        if (Array.isArray(parsedUsers)) {
+          parsedUsers.forEach(user => {
+            const userChats = localStorage.getItem(`chat_conversations_${user.id}`);
+            if (userChats) {
+              const parsedUserChats = JSON.parse(userChats);
+              if (Array.isArray(parsedUserChats)) {
+                parsedUserChats.forEach(conversation => {
+                  if (conversation.messages && Array.isArray(conversation.messages)) {
+                    conversation.messages.forEach((message: any) => {
+                      if (message.role === 'user') {
+                        // Look for amounts in user messages
+                        const amountMatches = message.content.match(/(\d+(?:\.\d+)?)\s*(lakh|lakhs|crore|crores|cr|cr\+|lakh\+|lakhs\+)/gi);
+                        if (amountMatches) {
+                          amountMatches.forEach((match: string) => {
+                            const [number, unit] = match.toLowerCase().split(/\s+/);
+                            const numValue = parseFloat(number);
+                            if (!isNaN(numValue)) {
+                              if (unit.includes('lakh')) {
+                                totalAmount += numValue * 0.01; // Convert lakhs to crores
+                              } else if (unit.includes('crore') || unit.includes('cr')) {
+                                totalAmount += numValue;
+                              }
+                            }
+                          });
+                        }
+                        
+                        // Also look for amounts in numbers followed by "CR" or "crore"
+                        const crMatches = message.content.match(/(\d+(?:\.\d+)?)\s*(?:CR|cr|crore|crores)/gi);
+                        if (crMatches) {
+                          crMatches.forEach((match: string) => {
+                            const number = match.toLowerCase().replace(/\s*(?:cr|crore|crores)/i, '');
+                            const numValue = parseFloat(number);
+                            if (!isNaN(numValue)) {
+                              totalAmount += numValue;
+                            }
+                          });
+                        }
+                      }
+                    });
+                  }
+                });
+              }
+            }
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Error calculating life goal amounts:', error);
+    }
+    
+    return Math.round(totalAmount * 100) / 100; // Round to 2 decimal places
+  };
+
+  useEffect(() => {
+    // Count conversations and calculate amounts on component mount
+    setTotalChats(countAllChatConversations());
+    setTotalLifeGoalAmount(calculateTotalLifeGoalAmounts());
+    
+    // Set up interval to update counts every 30 seconds
     const interval = setInterval(() => {
       setTotalChats(countAllChatConversations());
+      setTotalLifeGoalAmount(calculateTotalLifeGoalAmounts());
     }, 30000);
     
-    // Listen for storage changes to update count in real-time
+    // Listen for storage changes to update counts in real-time
     const handleStorageChange = () => {
       setTotalChats(countAllChatConversations());
+      setTotalLifeGoalAmount(calculateTotalLifeGoalAmounts());
     };
     
     window.addEventListener('storage', handleStorageChange);
@@ -90,12 +204,14 @@ export default function About() {
                 <div className="text-sm text-gray-600">{t.about.activeInvestors}</div>
               </div>
               <div className="text-center">
-                <div className="text-3xl font-bold text-blue-700 mb-2">₹15,000 करोड़+</div>
-                <div className="text-sm text-gray-600">Investment Plan Generated</div>
+                <div className="text-3xl font-bold text-blue-700 mb-2">
+                  {totalLifeGoalAmount > 0 ? `₹${totalLifeGoalAmount} CR+` : '₹0 CR+'}
+                </div>
+                <div className="text-sm text-gray-600">{t.about.assetsUnderManagement}</div>
               </div>
             </div>
 
-            <button className="bg-emerald-600 text-white px-8 py-3 rounded-lg hover:bg-emerald-700 transition-colors font-semibold">
+            <button className="bg-blue-600 text-white px-8 py-3 rounded-lg hover:bg-blue-700 transition-colors font-semibold">
               {t.about.startJourney}
             </button>
           </div>

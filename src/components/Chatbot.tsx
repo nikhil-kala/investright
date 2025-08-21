@@ -28,14 +28,7 @@ export default function Chatbot({ openChat = false, conversationId }: ChatbotPro
   const [userFirstName, setUserFirstName] = useState('');
   const [userLastName, setUserLastName] = useState('');
   const [isEmailSubmitting, setIsEmailSubmitting] = useState(false);
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: '1',
-      text: t.chatbot.welcomeMessage,
-      sender: 'bot',
-      timestamp: new Date()
-    }
-  ]);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [hasShownEmailPopup, setHasShownEmailPopup] = useState(false);
@@ -75,6 +68,48 @@ export default function Chatbot({ openChat = false, conversationId }: ChatbotPro
     }
   }, [openChat]);
 
+  // Initialize financial advisor conversation when chatbot opens
+  useEffect(() => {
+    if (isOpen && messages.length === 0) {
+      // Get initial message from the service
+      const getInitialMessage = async () => {
+        try {
+          const response = await sendChatMessageToGemini('', []);
+          if (response.success) {
+            const initialMessage = {
+              id: '1',
+              text: response.message,
+              sender: 'bot' as const,
+              timestamp: new Date()
+            };
+            setMessages([initialMessage]);
+          } else {
+            // Fallback message if service fails
+            const fallbackMessage = {
+              id: '1',
+              text: "Hi there, Welcome to InvestRight - your unbiased personal wealth advisor. I am here to help you achieve and prepare for your Key Life Goals through financial advice.\n\nI am here to help you achieve and prepare for your Key Life Goals through financial advice.\n\nLife Goal Preparedness refers to how ready and financially equipped an individual (or family) is to achieve their key life goals — such as:\n\n• Buying a house\n• Children's education\n• Marriage expenses\n• Retirement planning\n• Health & family security\n• Travel, lifestyle, or passion pursuits\n\nAre you ready to start?",
+              sender: 'bot' as const,
+              timestamp: new Date()
+            };
+            setMessages([fallbackMessage]);
+          }
+        } catch (error) {
+          console.error('Error getting initial message:', error);
+          // Fallback message if service fails
+          const fallbackMessage = {
+            id: '1',
+            text: "Hi there, Welcome to InvestRight - your unbiased personal wealth advisor. I am here to help you achieve and prepare for your Key Life Goals through financial advice.\n\nI am here to help you achieve and prepare for your Key Life Goals through financial advice.\n\nLife Goal Preparedness refers to how ready and financially equipped an individual (or family) is to achieve their key life goals — such as:\n\n• Buying a house\n• Children's education\n• Marriage expenses\n• Retirement planning\n• Health & family security\n• Travel, lifestyle, or passion pursuits\n\nAre you ready to start?",
+            sender: 'bot' as const,
+            timestamp: new Date()
+          };
+          setMessages([fallbackMessage]);
+        }
+      };
+      
+      getInitialMessage();
+    }
+  }, [isOpen, messages.length]);
+
   // Load specific conversation if conversationId is provided
   useEffect(() => {
     if (conversationId && isAuthenticated) {
@@ -83,36 +118,17 @@ export default function Chatbot({ openChat = false, conversationId }: ChatbotPro
   }, [conversationId, isAuthenticated]);
 
   const loadSpecificConversation = (convId: number) => {
-    try {
-      const currentUser = authService.getCurrentUser();
-      if (!currentUser) return;
-      
-      const storedChats = localStorage.getItem(`chat_conversations_${currentUser.id}`);
-      if (storedChats) {
-        const allConversations = JSON.parse(storedChats);
-        const conversation = allConversations.find((conv: any) => conv.id === convId);
-        
-        if (conversation) {
-          setMessages(conversation.messages);
-          // Add a welcome back message
-          const welcomeMessage: Message = {
-            id: Date.now().toString(),
-            text: `Welcome back! I've loaded your conversation about "${conversation.title}". How can I help you continue?`,
-            sender: 'bot',
-            timestamp: new Date()
-          };
-          setMessages(prev => [welcomeMessage, ...conversation.messages]);
-        }
-      }
-    } catch (error) {
-      console.error('Error loading conversation:', error);
+    const savedConversations = JSON.parse(localStorage.getItem('chatConversations') || '[]');
+    const conversation = savedConversations.find((conv: any) => conv.id === convId);
+    
+    if (conversation) {
+      setMessages(conversation.messages);
+      setEmailSubmitted(true);
     }
   };
 
-
-
   const handleSendMessage = async () => {
-    if (!inputValue.trim()) return;
+    if (!inputValue.trim() || isTyping) return;
 
     const userMessage: Message = {
       id: Date.now().toString(),
@@ -126,37 +142,35 @@ export default function Chatbot({ openChat = false, conversationId }: ChatbotPro
     setIsTyping(true);
 
     try {
-      // Send message to Gemini API
-      const result = await sendChatMessageToGemini(userMessage.text);
-      
-      if (result.success) {
+      // Convert messages to the format expected by the service
+      const conversationHistory = messages.map(msg => ({
+        role: msg.sender === 'user' ? 'user' as const : 'assistant' as const,
+        content: msg.text
+      }));
+
+      const response = await sendChatMessageToGemini(inputValue, conversationHistory);
+
+      if (response.success) {
         const botMessage: Message = {
           id: (Date.now() + 1).toString(),
-          text: result.message,
+          text: response.message,
           sender: 'bot',
           timestamp: new Date()
         };
         setMessages(prev => [...prev, botMessage]);
-        
-        // Save conversation to localStorage if user is authenticated
-        if (isAuthenticated && messages.length >= 1) {
-          saveConversationToLocalStorage();
-        }
       } else {
-        // Handle API error with a fallback message
         const errorMessage: Message = {
           id: (Date.now() + 1).toString(),
-          text: `I apologize, but I'm experiencing technical difficulties. Please try again later. (Error: ${result.message})`,
+          text: response.message,
           sender: 'bot',
           timestamp: new Date()
         };
         setMessages(prev => [...prev, errorMessage]);
       }
     } catch (error) {
-      // Handle unexpected errors
       const errorMessage: Message = {
         id: (Date.now() + 1).toString(),
-        text: 'I apologize, but I encountered an unexpected error. Please try again later.',
+        text: 'I apologize, but I encountered an error. Please try again.',
         sender: 'bot',
         timestamp: new Date()
       };
@@ -173,86 +187,38 @@ export default function Chatbot({ openChat = false, conversationId }: ChatbotPro
     }
   };
 
-  const saveConversationToLocalStorage = () => {
-    if (!isAuthenticated || messages.length < 2) return;
-    
-    try {
-      const currentUser = authService.getCurrentUser();
-      if (!currentUser) return;
-      
-      const conversation = {
-        id: Date.now(),
-        title: generateConversationTitle(messages),
-        date: new Date().toISOString(),
-        messages: messages,
-        summary: generateConversationSummary(messages)
-      };
-      
-      // Get existing conversations
-      const existingConversations = localStorage.getItem(`chat_conversations_${currentUser.id}`);
-      let allConversations = existingConversations ? JSON.parse(existingConversations) : [];
-      
-      // Add new conversation
-      allConversations.unshift(conversation);
-      
-      // Keep only last 10 conversations
-      allConversations = allConversations.slice(0, 10);
-      
-      // Save back to localStorage
-      localStorage.setItem(`chat_conversations_${currentUser.id}`, JSON.stringify(allConversations));
-    } catch (error) {
-      console.error('Error saving conversation:', error);
+  const handleCloseChat = () => {
+    if (messages.length > 1 && !emailSubmitted) {
+      // Offer to send transcript before closing
+      setShowEmailPopup(true);
+    } else {
+      setIsOpen(false);
+      setMessages([]);
+      setEmailSubmitted(false);
     }
   };
 
-  const generateConversationTitle = (msgs: Message[]): string => {
-    if (msgs.length === 0) return 'New Conversation';
-    
-    const firstUserMessage = msgs.find(msg => msg.sender === 'user');
-    if (!firstUserMessage) return 'New Conversation';
-    
-    const text = firstUserMessage.text;
-    if (text.length <= 30) return text;
-    return text.substring(0, 30) + '...';
-  };
-
-  const generateConversationSummary = (msgs: Message[]): string => {
-    if (msgs.length === 0) return 'No messages';
-    
-    const userMessages = msgs.filter(msg => msg.sender === 'user');
-    if (userMessages.length === 0) return 'No user messages';
-    
-    const firstUserMessage = userMessages[0].text;
-    if (firstUserMessage.length <= 50) return firstUserMessage;
-    return firstUserMessage.substring(0, 50) + '...';
-  };
-
-  const handleEmailSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!userEmail.trim() || !userFirstName.trim() || !userLastName.trim()) return;
+  const handleEmailSubmit = async () => {
+    if (!userEmail.trim() || !userFirstName.trim() || !userLastName.trim()) {
+      alert('Please fill in all fields');
+      return;
+    }
 
     setIsEmailSubmitting(true);
     
     try {
-      // Here you would typically send the email via your backend
-      // For now, we'll simulate the email sending
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // Simulate email sending
+      await new Promise(resolve => setTimeout(resolve, 1000));
       
-      // Close popup and show success message
+      setEmailSubmitted(true);
       setShowEmailPopup(false);
-      setEmailSubmitted(true); // Mark email as submitted
       
-      // Add a success message to the chat
-      const successMessage: Message = {
-        id: Date.now().toString(),
-        text: `✅ Transcript sent successfully to ${userEmail}!\n\nDear ${userFirstName} ${userLastName},\n\nYour email includes:\n• Complete conversation with timestamps\n• Key investment insights discussed\n• Actionable recommendations\n• Summary of important points\n\nCheck your inbox for the detailed transcript. You can also request additional transcripts anytime using the button below.`,
-        sender: 'bot',
-        timestamp: new Date()
-      };
-      setMessages(prev => [...prev, successMessage]);
+      // Save conversation to localStorage
+      saveConversationToLocalStorage();
       
+      alert('Transcript sent successfully! Check your email.');
     } catch (error) {
-      console.error('Error sending email:', error);
+      alert('Failed to send transcript. Please try again.');
     } finally {
       setIsEmailSubmitting(false);
     }
@@ -263,159 +229,128 @@ export default function Chatbot({ openChat = false, conversationId }: ChatbotPro
     setUserEmail('');
     setUserFirstName('');
     setUserLastName('');
-    setEmailSubmitted(false); // Reset email submission status
   };
 
   const handleLogin = () => {
     setShowAuthOptions(false);
-    setIsOpen(false);
     navigate('/login');
   };
 
   const handleSignup = () => {
     setShowAuthOptions(false);
-    setIsOpen(false);
-    navigate('/signup', { 
-      state: { 
-        from: '/dashboard' // Redirect to dashboard after signup and login
-      } 
-    });
+    navigate('/signup');
   };
 
   const handleSaveToAccount = () => {
     if (isAuthenticated) {
-      // User is authenticated, show email popup
-      setShowEmailPopup(true);
+      // Save conversation to account
+      saveConversationToLocalStorage();
+      alert('Conversation saved to your account!');
     } else {
-      // User is not authenticated, show auth options
+      // Show authentication options
       setShowAuthOptions(true);
     }
   };
 
-  const handleCloseChat = async () => {
-    // If user has provided email and there are messages, offer to send transcript
-    if (emailSubmitted && messages.length > 1) {
-      const shouldSend = window.confirm(
-        `Would you like me to send the complete conversation transcript to ${userFirstName} ${userLastName} at ${userEmail}?`
-      );
-      
-      if (shouldSend) {
-        try {
-          // Simulate sending the transcript
-          await new Promise(resolve => setTimeout(resolve, 1000));
-          alert(`Transcript sent to ${userFirstName} ${userLastName} at ${userEmail}! Check your inbox.`);
-        } catch (error) {
-          console.error('Error sending transcript:', error);
-        }
-      }
-    }
+  const saveConversationToLocalStorage = () => {
+    if (messages.length <= 1) return;
+
+    const conversation = {
+      id: Date.now(),
+      title: generateConversationTitle(),
+      summary: generateConversationSummary(),
+      messages: messages,
+      timestamp: new Date(),
+      userId: authService.getCurrentUser()?.id || 'anonymous'
+    };
+
+    const existingConversations = JSON.parse(localStorage.getItem('chatConversations') || '[]');
     
-    setIsOpen(false);
+    // Keep only the last 10 conversations
+    const updatedConversations = [conversation, ...existingConversations].slice(0, 10);
+    
+    localStorage.setItem('chatConversations', JSON.stringify(updatedConversations));
+  };
+
+  const generateConversationTitle = () => {
+    const firstUserMessage = messages.find(msg => msg.sender === 'user')?.text || '';
+    return firstUserMessage.length > 50 ? firstUserMessage.substring(0, 50) + '...' : firstUserMessage;
+  };
+
+  const generateConversationSummary = () => {
+    const userMessages = messages.filter(msg => msg.sender === 'user').map(msg => msg.text);
+    return userMessages.join(' | ');
   };
 
   const formatConversationForEmail = () => {
-    return messages.map(msg => {
-      const time = msg.timestamp.toLocaleTimeString();
-      const sender = msg.sender === 'user' ? 'You' : 'AI Assistant';
-      return `[${time}] ${sender}: ${msg.text}`;
-    }).join('\n\n');
+    return messages.map(msg => 
+      `${msg.sender === 'user' ? 'You' : 'InvestRight Advisor'}: ${msg.text}`
+    ).join('\n\n');
   };
+
+  if (!isOpen) {
+    return (
+      <div className="fixed bottom-6 right-6 z-50">
+        <button
+          onClick={() => setIsOpen(true)}
+          className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-4 rounded-full shadow-2xl hover:shadow-3xl transform hover:scale-110 transition-all duration-300 animate-pulse-glow"
+        >
+          <MessageCircle className="h-8 w-8" />
+        </button>
+      </div>
+    );
+  }
 
   return (
     <>
       {/* Email Collection Popup */}
       {showEmailPopup && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6">
-            <div className="text-center mb-6">
-              <div className="bg-blue-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Mail className="h-8 w-8 text-blue-600" />
-              </div>
-              <h3 className="text-xl font-bold text-gray-900 mb-2">
-                {emailSubmitted ? 'Update Email Address' : 'Send Chat Transcript'}
-              </h3>
-              <p className="text-gray-600">
-                {emailSubmitted 
-                  ? 'Change your email address to receive future chat transcripts.'
-                  : 'Get the complete AI conversation sent directly to your inbox. Perfect for saving important investment advice and insights.'
-                }
-              </p>
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl p-8 max-w-md w-full shadow-2xl">
+            <h3 className="text-xl font-bold text-gray-900 mb-4">Get Your Chat Transcript</h3>
+            <p className="text-gray-600 mb-6">We'll send a copy of your conversation to your email for future reference.</p>
+            
+            <div className="space-y-4">
+              <input
+                type="text"
+                placeholder="First Name *"
+                value={userFirstName}
+                onChange={(e) => setUserFirstName(e.target.value)}
+                className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                required
+              />
+              <input
+                type="text"
+                placeholder="Last Name *"
+                value={userLastName}
+                onChange={(e) => setUserLastName(e.target.value)}
+                className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                required
+              />
+              <input
+                type="email"
+                placeholder="Email Address *"
+                value={userEmail}
+                onChange={(e) => setUserEmail(e.target.value)}
+                className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                required
+              />
             </div>
-
-            <form onSubmit={handleEmailSubmit} className="space-y-4">
-              {/* First Name and Last Name */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label htmlFor="firstName" className="block text-sm font-medium text-gray-700 mb-2">
-                    First Name *
-                  </label>
-                  <input
-                    id="firstName"
-                    type="text"
-                    value={userFirstName}
-                    onChange={(e) => setUserFirstName(e.target.value)}
-                    placeholder="First Name"
-                    required
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  />
-                </div>
-                <div>
-                  <label htmlFor="lastName" className="block text-sm font-medium text-gray-700 mb-2">
-                    Last Name *
-                  </label>
-                  <input
-                    id="lastName"
-                    type="text"
-                    value={userLastName}
-                    onChange={(e) => setUserLastName(e.target.value)}
-                    placeholder="Last Name"
-                    required
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  />
-                </div>
-              </div>
-
-              {/* Email Address */}
-              <div>
-                <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
-                  Email Address *
-                </label>
-                <input
-                  id="email"
-                  type="email"
-                  value={userEmail}
-                  onChange={(e) => setUserEmail(e.target.value)}
-                  placeholder="your.email@example.com"
-                  required
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                />
-              </div>
-
-              <div className="flex space-x-3">
-                <button
-                  type="button"
-                  onClick={closeEmailPopup}
-                  className="flex-1 py-2 px-4 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors font-medium"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={isEmailSubmitting || !userEmail.trim() || !userFirstName.trim() || !userLastName.trim()}
-                  className="flex-1 py-2 px-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
-                >
-                  {isEmailSubmitting ? 'Sending...' : (emailSubmitted ? 'Update Email' : 'Send Transcript')}
-                </button>
-              </div>
-            </form>
-
-            <div className="mt-4 text-center">
-              <p className="text-xs text-gray-500">
-                {emailSubmitted 
-                  ? 'We\'ll send future transcripts to your new email address'
-                  : 'We\'ll send you a complete transcript of this conversation'
-                }
-              </p>
+            
+            <div className="flex space-x-3 mt-6">
+              <button
+                onClick={closeEmailPopup}
+                className="flex-1 px-4 py-3 border-2 border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleEmailSubmit}
+                disabled={isEmailSubmitting}
+                className="flex-1 px-4 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:opacity-50 transition-colors"
+              >
+                {isEmailSubmitting ? 'Sending...' : 'Send Transcript'}
+              </button>
             </div>
           </div>
         </div>
@@ -423,268 +358,294 @@ export default function Chatbot({ openChat = false, conversationId }: ChatbotPro
 
       {/* Authentication Options Popup */}
       {showAuthOptions && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6">
-            <div className="text-center mb-6">
-              <div className="bg-blue-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-                <User className="h-8 w-8 text-blue-600" />
-              </div>
-              <h3 className="text-xl font-bold text-gray-900 mb-2">
-                Save Conversation to Your Account
-              </h3>
-              <p className="text-gray-600">
-                Create an account or sign in to save this conversation and access it anytime from your dashboard.
-              </p>
-            </div>
-
-            <div className="space-y-4">
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl p-8 max-w-md w-full shadow-2xl">
+            <h3 className="text-xl font-bold text-gray-900 mb-4">Save Your Conversation</h3>
+            <p className="text-gray-600 mb-6">To save this conversation and access it later, please create an account or log in.</p>
+            
+            <div className="space-y-3">
               <button
                 onClick={handleSignup}
-                className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg hover:bg-blue-700 transition-colors font-medium flex items-center justify-center space-x-2"
+                className="w-full px-4 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors flex items-center justify-center space-x-2"
               >
-                <UserPlus className="h-4 w-4" />
+                <UserPlus className="h-5 w-5" />
                 <span>Create Account</span>
               </button>
-              
               <button
                 onClick={handleLogin}
-                className="w-full bg-green-600 text-white py-3 px-4 rounded-lg hover:bg-green-700 transition-colors font-medium flex items-center justify-center space-x-2"
+                className="w-full px-4 py-3 border-2 border-blue-600 text-blue-600 rounded-xl hover:bg-blue-50 transition-colors flex items-center justify-center space-x-2"
               >
-                <LogIn className="h-4 w-4" />
-                <span>Sign In</span>
-              </button>
-              
-              <button
-                onClick={() => setShowAuthOptions(false)}
-                className="w-full bg-gray-500 text-white py-3 px-4 rounded-lg hover:bg-gray-600 transition-colors font-medium"
-              >
-                Maybe Later
+                <LogIn className="h-5 w-5" />
+                <span>Log In</span>
               </button>
             </div>
-
-            <div className="mt-4 text-center">
-              <p className="text-xs text-gray-500">
-                Your conversation will be saved securely and accessible from your account dashboard
-              </p>
-            </div>
+            
+            <button
+              onClick={() => setShowAuthOptions(false)}
+              className="w-full px-4 py-3 text-gray-500 hover:text-gray-700 mt-4"
+            >
+              Maybe Later
+            </button>
           </div>
         </div>
       )}
 
-      {/* Chatbot Toggle Button */}
-      <div className="fixed bottom-6 right-6 z-50">
-        {!isOpen && (
-          <button
-            onClick={() => setIsOpen(true)}
-            className="bg-blue-600 text-white p-4 rounded-full shadow-lg hover:bg-blue-700 transition-colors duration-200 hover:scale-110"
-          >
-            <MessageCircle className="h-6 w-6" />
-          </button>
-        )}
+      {/* Chatbot Interface */}
+      <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-2">
+        <div className="bg-white rounded-2xl shadow-2xl w-full h-full max-w-none flex flex-col">
+          {/* Header */}
+          <div className="bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 text-white p-6 rounded-t-2xl flex items-center justify-between border-b border-blue-500 relative overflow-hidden">
+            {/* Animated background elements */}
+            <div className="absolute top-0 left-0 w-full h-full">
+              <div className="absolute top-4 left-4 w-20 h-20 bg-blue-400 rounded-full opacity-20 animate-pulse"></div>
+              <div className="absolute top-16 right-8 w-16 h-16 bg-indigo-400 rounded-full opacity-20 animate-pulse" style={{ animationDelay: '1s' }}></div>
+              <div className="absolute bottom-8 left-16 w-12 h-12 bg-blue-300 rounded-full opacity-20 animate-pulse" style={{ animationDelay: '2s' }}></div>
+            </div>
+            
+            <div className="flex items-center space-x-4 relative z-10">
+              <div className="w-12 h-12 bg-white bg-opacity-20 rounded-full flex items-center justify-center">
+                <span className="text-2xl">💼</span>
+              </div>
+              <div>
+                <h2 className="text-2xl font-bold">{t.chatbot.title}</h2>
+                <p className="text-blue-100 text-sm">{t.chatbot.subtitle}</p>
+              </div>
+            </div>
+            
+            <div className="flex items-center space-x-3 relative z-10">
+              <button
+                onClick={handleCloseChat}
+                className="p-2 hover:bg-white hover:bg-opacity-20 rounded-full transition-colors"
+                title="Close Chat"
+              >
+                <X className="h-6 w-6" />
+              </button>
+            </div>
+          </div>
+
+          {/* Messages */}
+          <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-gray-50">
+            {/* Transcript sent info */}
+            {emailSubmitted && (
+              <div className="flex justify-center mb-4">
+                <div className="bg-green-50 border-2 border-green-200 p-4 rounded-xl text-green-800 text-sm">
+                  ✅ Transcript sent to your email successfully!
+                </div>
+              </div>
+            )}
+
+            {/* Save conversation card */}
+            {messages.length > 1 && !emailSubmitted && (
+              <div className="flex justify-center mb-4">
+                <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-200 p-4 rounded-xl max-w-md">
+                  <div className="flex items-center space-x-3">
+                    <div className="bg-blue-100 p-3 rounded-full">
+                      <Mail className="h-5 w-5 text-blue-600" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold text-blue-900">
+                        Save This Conversation
+                      </p>
+                      <p className="text-xs text-blue-700">
+                        {isAuthenticated 
+                          ? "Send a transcript to your email for future reference"
+                          : "Create an account to save and access your conversations"
+                        }
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={handleSaveToAccount}
+                    className="bg-blue-600 text-white px-5 py-3 rounded-xl hover:bg-blue-700 transition-all duration-200 text-sm font-medium shadow-lg hover:shadow-xl mt-3 w-full"
+                  >
+                    {isAuthenticated ? 'Send Transcript' : 'Save to Account'}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Messages */}
+            {messages.map((message, index) => (
+              <div
+                key={message.id}
+                className={`flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'} mb-4 animate-fade-in`}
+                style={{ animationDelay: `${index * 0.1}s` }}
+              >
+                <div
+                  className={`max-w-[75%] p-5 rounded-2xl shadow-lg transition-all duration-300 hover:shadow-xl ${
+                    message.sender === 'user'
+                      ? 'bg-gradient-to-br from-blue-600 to-blue-700 text-white border-2 border-blue-500'
+                      : 'bg-gradient-to-br from-white to-gray-50 text-gray-900 border-2 border-gray-200'
+                  }`}
+                >
+                  {/* Message Header */}
+                  <div className={`flex items-center space-x-2 mb-3 ${
+                    message.sender === 'user' ? 'text-blue-100' : 'text-gray-600'
+                  }`}>
+                    {message.sender === 'user' ? (
+                      <div className="w-6 h-6 bg-blue-400 rounded-full flex items-center justify-center">
+                        <User className="h-3 w-3 text-white" />
+                      </div>
+                    ) : (
+                      <div className="w-6 h-6 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center">
+                        <Bot className="h-3 w-3 text-white" />
+                      </div>
+                    )}
+                    <span className="text-xs font-medium capitalize">
+                      {message.sender === 'user' ? 'You' : 'InvestRight Advisor'}
+                    </span>
+                    <span className={`text-xs ${
+                      message.sender === 'user' ? 'text-blue-200' : 'text-gray-400'
+                    }`}>
+                      {message.timestamp.toLocaleTimeString([], {
+                        hour: '2-digit',
+                        minute: '2-digit'
+                      })}
+                    </span>
+                  </div>
+
+                  {/* Message Content */}
+                  <div className={`prose prose-sm max-w-none ${
+                    message.sender === 'user' ? 'text-white' : 'text-gray-800'
+                  }`}>
+                    {message.sender === 'bot' ? (
+                      <div
+                        className="leading-relaxed"
+                        dangerouslySetInnerHTML={{
+                          __html: message.text
+                            .replace(/\*\*(.*?)\*\*/g, '<strong class="font-bold text-blue-700">$1</strong>')
+                            .replace(/\*(.*?)\*/g, '<em class="italic text-gray-600">$1</em>')
+                            .replace(/\n\n/g, '<br><br>')
+                            .replace(/\n/g, '<br>')
+                        }}
+                      />
+                    ) : (
+                      <p className="leading-relaxed">{message.text}</p>
+                    )}
+                  </div>
+
+                  {/* Message Footer */}
+                  <div className={`mt-3 pt-3 border-t ${
+                    message.sender === 'user' ? 'border-blue-500' : 'border-gray-200'
+                  }`}>
+                    <div className={`flex items-center justify-between text-xs ${
+                      message.sender === 'user' ? 'text-blue-200' : 'text-gray-500'
+                    }`}>
+                      <span className="flex items-center space-x-1">
+                        <div className={`w-2 h-2 rounded-full ${
+                          message.sender === 'user' ? 'bg-blue-400' : 'bg-green-500'
+                        }`}></div>
+                        <span>{message.sender === 'user' ? 'Sent' : 'Delivered'}</span>
+                      </span>
+                      <span className="font-mono">
+                        {message.timestamp.toLocaleDateString([], {
+                          month: 'short',
+                          day: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        })}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+
+            {/* Info message about transcript feature */}
+            {messages.length === 1 && (
+              <div className="flex justify-start mb-4 animate-fade-in">
+                <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-200 p-5 rounded-2xl shadow-lg max-w-[75%] relative overflow-hidden">
+                  <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-500 to-indigo-600"></div>
+                  <div className="flex items-start space-x-3">
+                    <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center flex-shrink-0">
+                      <span className="text-white text-lg">💡</span>
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-sm text-blue-800 leading-relaxed">
+                        <strong className="font-semibold text-blue-900">Pro Tip:</strong> After our conversation, you can save it to your account or get a transcript sent to your email for future reference.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+            
+            {/* Typing indicator */}
+            {isTyping && (
+              <div className="flex justify-start mb-4 animate-fade-in">
+                <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border-2 border-blue-200 p-5 rounded-2xl shadow-lg max-w-[75%]">
+                  <div className="flex items-center space-x-3">
+                    <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center">
+                      <Bot className="h-4 w-4 text-white animate-pulse" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-blue-800 mb-2">InvestRight Advisor is typing...</p>
+                      <div className="flex space-x-1">
+                        <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce"></div>
+                        <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                        <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div ref={messagesEndRef} />
+          </div>
+
+          {/* Input */}
+          <div className="p-6 border-t border-gray-200 bg-white">
+            {/* Send Transcript Button */}
+            {messages.length > 1 && (
+              <div className="mb-4 flex justify-center">
+                <button
+                  onClick={handleSaveToAccount}
+                  className={`flex items-center space-x-3 px-6 py-3 rounded-xl transition-all duration-200 text-sm font-medium shadow-lg hover:shadow-xl ${
+                    emailSubmitted
+                      ? 'bg-green-600 text-white hover:bg-green-700'
+                      : 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:from-blue-700 hover:to-indigo-700'
+                  }`}
+                >
+                  <Mail className="h-5 w-5" />
+                  <span>
+                    {emailSubmitted
+                      ? 'Update Email'
+                      : isAuthenticated
+                        ? 'Send Transcript to Email'
+                        : 'Save to Account'
+                    }
+                  </span>
+                </button>
+              </div>
+            )}
+
+            <div className="flex space-x-3">
+              <div className="flex-1 relative">
+                <input
+                  type="text"
+                  value={inputValue}
+                  onChange={(e) => setInputValue(e.target.value)}
+                  onKeyPress={handleKeyPress}
+                  placeholder={isTyping ? "AI is typing..." : t.chatbot.placeholder}
+                  disabled={isTyping}
+                  className="w-full px-5 py-4 border-2 border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-50 text-sm transition-all duration-200 bg-white hover:border-gray-400"
+                />
+                <div className="absolute inset-y-0 right-3 flex items-center">
+                  <div className="w-2 h-2 bg-gray-400 rounded-full animate-pulse"></div>
+                </div>
+              </div>
+              <button
+                onClick={handleSendMessage}
+                disabled={!inputValue.trim() || isTyping}
+                className="px-6 py-4 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl hover:from-blue-700 hover:to-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 font-medium shadow-lg hover:shadow-xl transform hover:scale-105 active:scale-95"
+              >
+                <Send className="h-5 w-5" />
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
-
-                     {/* Chatbot Interface */}
-               {isOpen && (
-                 <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-2">
-                   <div className="bg-white rounded-2xl shadow-2xl w-full h-full max-w-none flex flex-col">
-                     {/* Header */}
-                     <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white p-6 rounded-t-2xl flex items-center justify-between border-b border-blue-500">
-                       <div className="flex items-center space-x-4">
-                         <div className="bg-white bg-opacity-20 p-3 rounded-xl">
-                           {/* InvestRight Logo */}
-                           <div className="relative">
-                             <div className="w-8 h-8 flex items-center justify-center">
-                               <div className="relative">
-                                 {/* Upward trending line */}
-                                 <svg className="w-6 h-6 text-white" viewBox="0 0 24 24" fill="none">
-                                   <path 
-                                     d="M3 18L9 12L15 16L21 6" 
-                                     stroke="currentColor" 
-                                     strokeWidth="2.5" 
-                                     strokeLinecap="round" 
-                                     strokeLinejoin="round"
-                                   />
-                                 </svg>
-                                 {/* Green circle at peak */}
-                                 <div className="absolute -top-1 -right-1 w-2 h-2 bg-green-500 rounded-full"></div>
-                                 {/* Green arrow above */}
-                                 <div className="absolute -top-2.5 -right-1 w-0 h-0 border-l-2 border-r-2 border-b-3 border-l-transparent border-r-transparent border-b-green-500"></div>
-                               </div>
-                             </div>
-                           </div>
-                         </div>
-                         <div>
-                           <h3 className="text-xl font-bold">{t.chatbot.title}</h3>
-                           <p className="text-blue-100">{t.chatbot.subtitle}</p>
-                         </div>
-                       </div>
-                       <div className="flex items-center space-x-3">
-                         <button
-                           onClick={() => setShowEmailPopup(true)}
-                           className={`p-3 rounded-xl transition-all duration-200 ${
-                             emailSubmitted
-                               ? 'bg-green-500 hover:bg-green-600 text-white shadow-lg'
-                               : 'bg-white bg-opacity-20 hover:bg-opacity-30 text-white hover:scale-105'
-                           }`}
-                           title={emailSubmitted ? 'Email registered - Click to update' : 'Send transcript to email'}
-                         >
-                           <Mail className="h-5 w-5" />
-                         </button>
-                         <button
-                           onClick={handleCloseChat}
-                           className="text-white hover:text-blue-100 transition-colors p-2 hover:bg-white hover:bg-opacity-20 rounded-lg"
-                         >
-                           <X className="h-6 w-6" />
-                         </button>
-                       </div>
-                     </div>
-
-                               {/* Messages */}
-                     <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-gray-50">
-                       {emailSubmitted && (
-                         <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6">
-                           <div className="flex items-center justify-between">
-                             <div className="flex items-center space-x-3">
-                               <Mail className="h-5 w-5 text-blue-600" />
-                               <span className="text-sm text-blue-800">
-                                 Transcripts will be sent to: <span className="font-medium">{userFirstName} {userLastName}</span> at <span className="font-medium">{userEmail}</span>
-                               </span>
-                             </div>
-                             <button
-                               onClick={() => setShowEmailPopup(true)}
-                               className="text-sm text-blue-600 hover:text-blue-800 underline font-medium"
-                             >
-                               Change
-                             </button>
-                           </div>
-                         </div>
-                       )}
-
-                       {messages.length > 1 && !emailSubmitted && (
-                         <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-5 mb-6">
-                           <div className="flex items-center justify-between">
-                             <div className="flex items-center space-x-4">
-                               <div className="bg-blue-100 p-3 rounded-full">
-                                 <Mail className="h-5 w-5 text-blue-600" />
-                               </div>
-                               <div>
-                                 <p className="text-sm font-semibold text-blue-900">
-                                   Save This Conversation
-                                 </p>
-                                 <p className="text-sm text-blue-700">
-                                   {isAuthenticated
-                                     ? 'Get a complete transcript sent to your email'
-                                     : 'Create an account to save and access this conversation anytime'
-                                   }
-                                 </p>
-                               </div>
-                             </div>
-                             <button
-                               onClick={handleSaveToAccount}
-                               className="bg-blue-600 text-white px-5 py-3 rounded-xl hover:bg-blue-700 transition-all duration-200 text-sm font-medium shadow-lg hover:shadow-xl"
-                             >
-                               {isAuthenticated ? 'Send Transcript' : 'Save to Account'}
-                             </button>
-                           </div>
-                         </div>
-                       )}
-
-                       {messages.map((message) => (
-                         <div
-                           key={message.id}
-                           className={`flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'}`}
-                         >
-                           <div
-                             className={`max-w-[70%] p-4 rounded-2xl shadow-sm ${
-                               message.sender === 'user'
-                                 ? 'bg-blue-600 text-white'
-                                 : 'bg-white text-gray-900 border border-gray-200'
-                             }`}
-                           >
-                             <p className="text-sm leading-relaxed">{message.text}</p>
-                             <p className={`text-xs mt-2 ${
-                               message.sender === 'user' ? 'text-blue-100' : 'text-gray-500'
-                             }`}>
-                               {message.timestamp.toLocaleTimeString()}
-                             </p>
-                           </div>
-                         </div>
-                       ))}
-
-                       {/* Info message about transcript feature */}
-                       {messages.length === 1 && (
-                         <div className="flex justify-start">
-                           <div className="bg-blue-50 border border-blue-200 p-4 rounded-xl max-w-[70%]">
-                             <p className="text-sm text-blue-800 leading-relaxed">
-                               💡 <strong>Tip:</strong> After our conversation, you can save it to your account or get a transcript sent to your email for future reference.
-                             </p>
-                           </div>
-                         </div>
-                       )}
-
-                       {isTyping && (
-                         <div className="flex justify-start">
-                           <div className="bg-white border border-gray-200 p-4 rounded-2xl shadow-sm">
-                             <div className="flex space-x-2">
-                               <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
-                               <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                               <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
-                             </div>
-                           </div>
-                         </div>
-                       )}
-
-                       <div ref={messagesEndRef} />
-                     </div>
-
-                               {/* Input */}
-                     <div className="p-6 border-t border-gray-200 bg-white">
-                       {/* Send Transcript Button */}
-                       {messages.length > 1 && (
-                         <div className="mb-4 flex justify-center">
-                           <button
-                             onClick={handleSaveToAccount}
-                             className={`flex items-center space-x-3 px-6 py-3 rounded-xl transition-all duration-200 text-sm font-medium shadow-lg hover:shadow-xl ${
-                               emailSubmitted
-                                 ? 'bg-green-600 text-white hover:bg-green-700'
-                                 : 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:from-blue-700 hover:to-indigo-700'
-                             }`}
-                           >
-                             <Mail className="h-5 w-5" />
-                             <span>
-                               {emailSubmitted
-                                 ? 'Update Email'
-                                 : isAuthenticated
-                                   ? 'Send Transcript to Email'
-                                   : 'Save to Account'
-                               }
-                             </span>
-                           </button>
-                         </div>
-                       )}
-
-                       <div className="flex space-x-3">
-                         <input
-                           type="text"
-                           value={inputValue}
-                           onChange={(e) => setInputValue(e.target.value)}
-                           onKeyPress={handleKeyPress}
-                           placeholder={isTyping ? "AI is typing..." : t.chatbot.placeholder}
-                           disabled={isTyping}
-                           className="flex-1 px-5 py-4 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50 text-sm"
-                         />
-                         <button
-                           onClick={handleSendMessage}
-                           disabled={!inputValue.trim() || isTyping}
-                           className="bg-blue-600 text-white p-4 rounded-xl hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-lg hover:shadow-xl"
-                         >
-                           <Send className="h-5 w-5" />
-                         </button>
-                       </div>
-                     </div>
-                   </div>
-                 </div>
-               )}
-             </>
-           );
-         }
+    </>
+  );
+}

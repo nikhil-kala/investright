@@ -85,6 +85,7 @@ export interface LanguageContent {
     description: string;
     activeInvestors: string;
     assetsUnderManagement: string;
+    investmentPlanValue: string;
     averageFee: string;
     userRating: string;
     startJourney: string;
