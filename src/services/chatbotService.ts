@@ -35,6 +35,16 @@ export const sendChatMessageToGemini = async (
     console.log('ChatbotService: Starting with userMessage:', userMessage);
     console.log('ChatbotService: Conversation history length:', conversationHistory.length);
     
+    // Extract user's name from conversation history
+    let userName = '';
+    if (conversationHistory.length >= 3) {
+      // Find the user's name from the third message (when they provided their name)
+      const nameMessage = conversationHistory[2];
+      if (nameMessage.role === 'user') {
+        userName = nameMessage.content.trim();
+      }
+    }
+    
     const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
     
     if (!apiKey || apiKey === 'your-gemini-api-key-here') {
@@ -93,27 +103,30 @@ export const sendChatMessageToGemini = async (
     // Handle fourth message - Get user's life goal
     if (conversationHistory.length === 3) {
       console.log('ChatbotService: Handling fourth message - getting life goal');
+      const greeting = userName ? `${userName}, ` : '';
       return {
         success: true,
-        message: FINANCIAL_ADVISOR_FLOW.goalQuestion
+        message: `${greeting}${FINANCIAL_ADVISOR_FLOW.goalQuestion}`
       };
     }
 
     // Handle fifth message - Get user's income
     if (conversationHistory.length === 4) {
       console.log('ChatbotService: Handling fifth message - getting income');
+      const greeting = userName ? `${userName}, ` : '';
       return {
         success: true,
-        message: "That's a great goal! To provide you with the best advice, I need to understand a bit more about your financial situation. What is your current monthly income?"
+        message: `${greeting}That's a great goal! To provide you with the best advice, I need to understand a bit more about your financial situation. What is your current monthly income?`
       };
     }
 
     // Handle sixth message - Get user's risk tolerance
     if (conversationHistory.length === 5) {
       console.log('ChatbotService: Handling sixth message - getting risk tolerance');
+      const greeting = userName ? `${userName}, ` : '';
       return {
         success: true,
-        message: "Thank you! Now, how would you describe your risk tolerance? Are you:\n\n1. Conservative (prefer safe, low-risk investments)\n2. Moderate (comfortable with some risk for better returns)\n3. Aggressive (willing to take higher risks for potentially higher returns)"
+        message: `${greeting}Thank you! Now, how would you describe your risk tolerance? Are you:\n\n1. Conservative (prefer safe, low-risk investments)\n2. Moderate (comfortable with some risk for better returns)\n3. Aggressive (willing to take higher risks for potentially higher returns)`
       };
     }
 
@@ -145,32 +158,7 @@ const generateFinancialAdvice = async (
   try {
     const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
     
-    const systemInstruction = `You are an expert financial advisor specializing in Indian investment options. Based on the conversation history, provide comprehensive financial advice that includes:
-
-1. Assessment of their goal achievability based on their current financial situation
-2. Risk appetite evaluation and recommendations
-3. Specific investment options available in India (mutual funds, stocks, FDs, PPF, NPS, etc.)
-4. Income enhancement suggestions if goals are not achievable (upskilling, side business, etc.)
-5. Personalized investment plan with realistic timelines
-6. Important disclaimers about seeking professional guidance
-
-IMPORTANT RULES:
-- Put an asterisk (*) next to any return on investment numbers
-- Keep advice practical and India-specific
-- Use a friendly, professional, educative, and engaging tone
-- Address the user by their name if provided
-- Be realistic about goal achievability
-- If goals are not achievable with current income, suggest income enhancement options like:
-  * Upskilling in their profession
-  * Starting a side business
-  * Starting a new business
-  * Additional income sources
-- Keep the response under 400 words
-- Focus on actionable advice
-
-Conversation history: ${conversationHistory.map(msg => `${msg.role}: ${msg.content}`).join('\n')}
-
-Provide comprehensive financial advice based on the information gathered.`;
+    const systemInstruction = "You are an expert financial advisor specializing in Indian investment options. Based on the conversation history, provide comprehensive financial advice that includes: 1. Assessment of their goal achievability based on their current financial situation, 2. Risk appetite evaluation and recommendations, 3. Specific investment options available in India (mutual funds, stocks, FDs, PPF, NPS, etc.), 4. Income enhancement suggestions if goals are not achievable (upskilling, side business, etc.), 5. Personalized investment plan with realistic timelines, 6. Important disclaimers about seeking professional guidance. IMPORTANT RULES: - Put an asterisk (*) next to any return on investment numbers - Keep advice practical and India-specific - Use a friendly, professional, educative, and engaging tone - Address the user by their name if provided - Be realistic about goal achievability - If goals are not achievable with current income, suggest income enhancement options like: * Upskilling in their profession * Starting a side business * Starting a new business * Additional income sources - Keep the response under 400 words - Focus on actionable advice. Conversation history: " + conversationHistory.map(msg => `${msg.role}: ${msg.content}`).join('\n') + "\n\nProvide comprehensive financial advice based on the information gathered.";
 
     const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${apiKey}`, {
       method: 'POST',
