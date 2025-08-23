@@ -3,6 +3,7 @@ import { MessageCircle, X, Send, Bot, User, AlertCircle, Mail, LogIn, UserPlus }
 import { useLanguage } from '../hooks/useLanguage';
 import { sendChatMessageToGemini } from '../services/chatbotService';
 import { authService } from '../services/authService';
+import { chatService, ChatMessage as ChatMessageType, ChatConversation } from '../services/chatService';
 import { useNavigate } from 'react-router-dom';
 
 interface Message {
@@ -31,13 +32,23 @@ export default function Chatbot({ openChat = false, conversationId }: ChatbotPro
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [isTyping, setIsTyping] = useState(false);
+  const [isGeneratingPlan, setIsGeneratingPlan] = useState(false);
   const [hasShownEmailPopup, setHasShownEmailPopup] = useState(false);
   const [emailSubmitted, setEmailSubmitted] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [currentConversationId, setCurrentConversationId] = useState<string>('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  const focusInput = () => {
+    // Focus the input field after a short delay to ensure DOM is updated
+    setTimeout(() => {
+      inputRef.current?.focus();
+    }, 100);
   };
 
   useEffect(() => {
@@ -47,18 +58,29 @@ export default function Chatbot({ openChat = false, conversationId }: ChatbotPro
   useEffect(() => {
     // Check authentication status
     const checkAuth = () => {
-      setIsAuthenticated(authService.isAuthenticated());
+      const isAuth = authService.isAuthenticated();
+      console.log('Chatbot: Authentication check - isAuth:', isAuth);
+      setIsAuthenticated(isAuth);
     };
 
+    // Initialize auth service and check status
+    authService.initializeAuth();
     checkAuth();
 
     // Listen for storage changes (when user logs in/out in another tab)
     const handleStorageChange = () => {
+      console.log('Chatbot: Storage change detected, rechecking auth');
       checkAuth();
     };
 
+    // Also check auth when component mounts and when messages change
+    const interval = setInterval(checkAuth, 2000); // Check every 2 seconds
+
     window.addEventListener('storage', handleStorageChange);
-    return () => window.removeEventListener('storage', handleStorageChange);
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      clearInterval(interval);
+    };
   }, []);
 
   // Auto-open chatbot if coming from dashboard
@@ -68,9 +90,20 @@ export default function Chatbot({ openChat = false, conversationId }: ChatbotPro
     }
   }, [openChat]);
 
+  // Focus input when chatbot opens
+  useEffect(() => {
+    if (isOpen) {
+      focusInput();
+    }
+  }, [isOpen]);
+
   // Initialize financial advisor conversation when chatbot opens
   useEffect(() => {
     if (isOpen && messages.length === 0) {
+      // Generate a new conversation ID
+      const newConversationId = chatService.generateConversationId();
+      setCurrentConversationId(newConversationId);
+      
       // Get initial message from the service
       const getInitialMessage = async () => {
         try {
@@ -83,6 +116,20 @@ export default function Chatbot({ openChat = false, conversationId }: ChatbotPro
               timestamp: new Date()
             };
             setMessages([initialMessage]);
+            
+            // Store initial bot message in Supabase if user is authenticated
+            if (isAuthenticated) {
+              const currentUser = authService.getCurrentUser();
+              if (currentUser) {
+                await chatService.storeMessage({
+                  user_email: currentUser.email,
+                  message_text: response.message,
+                  sender: 'bot',
+                  timestamp: new Date(),
+                  conversation_id: newConversationId
+                });
+              }
+            }
           } else {
             // Fallback message if service fails
             const fallbackMessage = {
@@ -92,6 +139,20 @@ export default function Chatbot({ openChat = false, conversationId }: ChatbotPro
               timestamp: new Date()
             };
             setMessages([fallbackMessage]);
+            
+            // Store fallback message in Supabase if user is authenticated
+            if (isAuthenticated) {
+              const currentUser = authService.getCurrentUser();
+              if (currentUser) {
+                await chatService.storeMessage({
+                  user_email: currentUser.email,
+                  message_text: fallbackMessage.text,
+                  sender: 'bot',
+                  timestamp: new Date(),
+                  conversation_id: newConversationId
+                });
+              }
+            }
           }
         } catch (error) {
           console.error('Error getting initial message:', error);
@@ -103,12 +164,26 @@ export default function Chatbot({ openChat = false, conversationId }: ChatbotPro
             timestamp: new Date()
           };
           setMessages([fallbackMessage]);
+          
+          // Store fallback message in Supabase if user is authenticated
+          if (isAuthenticated) {
+            const currentUser = authService.getCurrentUser();
+            if (currentUser) {
+              await chatService.storeMessage({
+                user_email: currentUser.email,
+                message_text: fallbackMessage.text,
+                sender: 'bot',
+                timestamp: new Date(),
+                conversation_id: newConversationId
+              });
+            }
+          }
         }
       };
       
       getInitialMessage();
     }
-  }, [isOpen, messages.length]);
+  }, [isOpen, messages.length, isAuthenticated]);
 
   // Load specific conversation if conversationId is provided
   useEffect(() => {
@@ -117,13 +192,55 @@ export default function Chatbot({ openChat = false, conversationId }: ChatbotPro
     }
   }, [conversationId, isAuthenticated]);
 
-  const loadSpecificConversation = (convId: number) => {
-    const savedConversations = JSON.parse(localStorage.getItem('chatConversations') || '[]');
-    const conversation = savedConversations.find((conv: any) => conv.id === convId);
+  // Check for pending conversations after authentication
+  useEffect(() => {
+    if (isAuthenticated && messages.length > 1) {
+      const pendingConversation = localStorage.getItem('pendingConversation');
+      if (pendingConversation) {
+        try {
+          const pending = JSON.parse(pendingConversation);
+          // If this is the same conversation, save it to the user's account
+          if (pending.conversationId === currentConversationId) {
+            handleSavePendingConversation();
+          }
+        } catch (error) {
+          console.error('Error parsing pending conversation:', error);
+        }
+      }
+    }
+  }, [isAuthenticated, messages.length, currentConversationId]);
+
+  const loadSpecificConversation = async (convId: number) => {
+    if (!isAuthenticated) return;
     
-    if (conversation) {
-      setMessages(conversation.messages);
-      setEmailSubmitted(true);
+    const currentUser = authService.getCurrentUser();
+    if (!currentUser) return;
+    
+    try {
+      const result = await chatService.getConversation(convId.toString(), currentUser.email);
+      if (result.success && result.conversation) {
+        // Convert ChatMessage to Message format
+        const convertedMessages: Message[] = result.conversation.messages.map(msg => ({
+          id: msg.id?.toString() || Date.now().toString(),
+          text: msg.message_text,
+          sender: msg.sender,
+          timestamp: msg.timestamp
+        }));
+        
+        setMessages(convertedMessages);
+        setCurrentConversationId(result.conversation.id);
+        setEmailSubmitted(true);
+      }
+    } catch (error) {
+      console.error('Error loading conversation:', error);
+      // Fallback to localStorage
+      const savedConversations = JSON.parse(localStorage.getItem('chatConversations') || '[]');
+      const conversation = savedConversations.find((conv: any) => conv.id === convId);
+      
+      if (conversation) {
+        setMessages(conversation.messages);
+        setEmailSubmitted(true);
+      }
     }
   };
 
@@ -141,14 +258,40 @@ export default function Chatbot({ openChat = false, conversationId }: ChatbotPro
     setInputValue('');
     setIsTyping(true);
 
+    // Store user message in Supabase if authenticated
+    if (isAuthenticated && currentConversationId) {
+      const currentUser = authService.getCurrentUser();
+      if (currentUser) {
+        try {
+          await chatService.storeMessage({
+            user_email: currentUser.email,
+            message_text: inputValue,
+            sender: 'user',
+            timestamp: new Date(),
+            conversation_id: currentConversationId
+          });
+        } catch (error) {
+          console.error('Error storing user message:', error);
+        }
+      }
+    }
+
     try {
       // Convert messages to the format expected by the service
+      // Use the previous messages (before adding the current user message) to maintain proper conversation flow
       const conversationHistory = messages.map(msg => ({
         role: msg.sender === 'user' ? 'user' as const : 'assistant' as const,
         content: msg.text
       }));
 
+      console.log('Chatbot: Sending to Gemini with conversation history length:', conversationHistory.length);
+      console.log('Chatbot: Current user input:', inputValue);
       const response = await sendChatMessageToGemini(inputValue, conversationHistory);
+      console.log('Chatbot: Received response from service:', {
+        success: response.success,
+        messageLength: response.message?.length,
+        isGeneratingPlan: response.isGeneratingPlan
+      });
 
       if (response.success) {
         const botMessage: Message = {
@@ -158,6 +301,35 @@ export default function Chatbot({ openChat = false, conversationId }: ChatbotPro
           timestamp: new Date()
         };
         setMessages(prev => [...prev, botMessage]);
+        
+        // Check if this is a plan generation trigger (should rarely happen now since we generate directly)
+        if (response.isGeneratingPlan) {
+          console.log('Chatbot: Investment plan generation triggered');
+          setIsGeneratingPlan(true);
+          
+          // Brief delay for UX then turn off loading
+          setTimeout(() => {
+            setIsGeneratingPlan(false);
+          }, 500);
+        }
+        
+        // Store bot message in Supabase if authenticated
+        if (isAuthenticated && currentConversationId) {
+          const currentUser = authService.getCurrentUser();
+          if (currentUser) {
+            try {
+              await chatService.storeMessage({
+                user_email: currentUser.email,
+                message_text: response.message,
+                sender: 'bot',
+                timestamp: new Date(),
+                conversation_id: currentConversationId
+              });
+            } catch (error) {
+              console.error('Error storing bot message:', error);
+            }
+          }
+        }
       } else {
         const errorMessage: Message = {
           id: (Date.now() + 1).toString(),
@@ -166,6 +338,24 @@ export default function Chatbot({ openChat = false, conversationId }: ChatbotPro
           timestamp: new Date()
         };
         setMessages(prev => [...prev, errorMessage]);
+        
+        // Store error message in Supabase if authenticated
+        if (isAuthenticated && currentConversationId) {
+          const currentUser = authService.getCurrentUser();
+          if (currentUser) {
+            try {
+              await chatService.storeMessage({
+                user_email: currentUser.email,
+                message_text: response.message,
+                sender: 'bot',
+                timestamp: new Date(),
+                conversation_id: currentConversationId
+              });
+            } catch (error) {
+              console.error('Error storing error message:', error);
+            }
+          }
+        }
       }
     } catch (error) {
       const errorMessage: Message = {
@@ -175,8 +365,28 @@ export default function Chatbot({ openChat = false, conversationId }: ChatbotPro
         timestamp: new Date()
       };
       setMessages(prev => [...prev, errorMessage]);
+      
+      // Store error message in Supabase if authenticated
+      if (isAuthenticated && currentConversationId) {
+        const currentUser = authService.getCurrentUser();
+        if (currentUser) {
+          try {
+            await chatService.storeMessage({
+              user_email: currentUser.email,
+              message_text: errorMessage.text,
+              sender: 'bot',
+              timestamp: new Date(),
+              conversation_id: currentConversationId
+            });
+          } catch (error) {
+            console.error('Error storing error message:', error);
+          }
+        }
+      }
     } finally {
       setIsTyping(false);
+      // Focus the input field so user can type again
+      focusInput();
     }
   };
 
@@ -188,14 +398,12 @@ export default function Chatbot({ openChat = false, conversationId }: ChatbotPro
   };
 
   const handleCloseChat = () => {
-    if (messages.length > 1 && !emailSubmitted) {
-      // Offer to send transcript before closing
-      setShowEmailPopup(true);
-    } else {
-      setIsOpen(false);
-      setMessages([]);
-      setEmailSubmitted(false);
-    }
+    // Always close the chat when close button is clicked
+    setIsOpen(false);
+    setMessages([]);
+    setEmailSubmitted(false);
+    setShowEmailPopup(false);
+    setShowAuthOptions(false);
   };
 
   const handleEmailSubmit = async () => {
@@ -233,22 +441,110 @@ export default function Chatbot({ openChat = false, conversationId }: ChatbotPro
 
   const handleLogin = () => {
     setShowAuthOptions(false);
-    navigate('/login');
+    // Store conversation temporarily before navigating
+    if (messages.length > 1) {
+      localStorage.setItem('pendingConversation', JSON.stringify({
+        messages: messages,
+        conversationId: currentConversationId,
+        timestamp: new Date().toISOString()
+      }));
+    }
+    navigate('/login', { state: { returnToChat: true } });
   };
 
   const handleSignup = () => {
     setShowAuthOptions(false);
-    navigate('/signup');
+    // Store conversation temporarily before navigating
+    if (messages.length > 1) {
+      localStorage.setItem('pendingConversation', JSON.stringify({
+        messages: messages,
+        conversationId: currentConversationId,
+        timestamp: new Date().toISOString()
+      }));
+    }
+    navigate('/signup', { state: { returnToChat: true } });
   };
 
-  const handleSaveToAccount = () => {
+  const handleSaveToAccount = async () => {
+    console.log('handleSaveToAccount called, isAuthenticated:', isAuthenticated);
+    
     if (isAuthenticated) {
-      // Save conversation to account
-      saveConversationToLocalStorage();
-      alert('Conversation saved to your account!');
+      try {
+        // Save conversation to both localStorage and Supabase
+        const currentUser = authService.getCurrentUser();
+        if (currentUser && messages.length > 1) {
+          // Save to Supabase first
+          for (const message of messages) {
+            await chatService.storeMessage({
+              user_email: currentUser.email,
+              message_text: message.text,
+              sender: message.sender,
+              timestamp: message.timestamp,
+              conversation_id: currentConversationId
+            });
+          }
+          
+          // Also save to localStorage as backup
+          saveConversationToLocalStorage();
+          
+          alert('Conversation saved to your account successfully! You can access it from your dashboard.');
+        } else {
+          alert('No messages to save or user not found.');
+        }
+      } catch (error) {
+        console.error('Error saving to account:', error);
+        // Fallback to localStorage only
+        saveConversationToLocalStorage();
+        alert('Saved to local storage. There was an issue saving to your account.');
+      }
     } else {
       // Show authentication options
+      console.log('User not authenticated, showing auth options');
       setShowAuthOptions(true);
+    }
+  };
+
+  const handleEmailTranscript = () => {
+    // Show email popup for transcript
+    setShowEmailPopup(true);
+  };
+
+  const handleSaveAndClose = () => {
+    // Save conversation first, then close
+    if (messages.length > 1) {
+      saveConversationToLocalStorage();
+      alert('Conversation saved! Closing chat.');
+    }
+    handleCloseChat();
+  };
+
+  const handleSavePendingConversation = async () => {
+    try {
+      const currentUser = authService.getCurrentUser();
+      if (!currentUser) return;
+
+      // Save conversation to Supabase
+      for (const message of messages) {
+        await chatService.storeMessage({
+          user_email: currentUser.email,
+          message_text: message.text,
+          sender: message.sender,
+          timestamp: message.timestamp,
+          conversation_id: currentConversationId
+        });
+      }
+
+      // Also save to localStorage as backup
+      saveConversationToLocalStorage();
+
+      // Clear the pending conversation
+      localStorage.removeItem('pendingConversation');
+
+      // Show success message
+      alert('Conversation saved to your account successfully! You can access it from your dashboard.');
+    } catch (error) {
+      console.error('Error saving pending conversation:', error);
+      alert('There was an issue saving your conversation. It has been saved locally as backup.');
     }
   };
 
@@ -289,14 +585,14 @@ export default function Chatbot({ openChat = false, conversationId }: ChatbotPro
   };
 
   if (!isOpen) {
-    return (
+  return (
       <div className="fixed bottom-6 right-6 z-50">
-        <button
-          onClick={() => setIsOpen(true)}
+          <button
+            onClick={() => setIsOpen(true)}
           className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-4 rounded-full shadow-2xl hover:shadow-3xl transform hover:scale-110 transition-all duration-300 animate-pulse-glow"
-        >
+          >
           <MessageCircle className="h-8 w-8" />
-        </button>
+          </button>
       </div>
     );
   }
@@ -378,8 +674,8 @@ export default function Chatbot({ openChat = false, conversationId }: ChatbotPro
                 <LogIn className="h-5 w-5" />
                 <span>Log In</span>
               </button>
-            </div>
-            
+      </div>
+
             <button
               onClick={() => setShowAuthOptions(false)}
               className="w-full px-4 py-3 text-gray-500 hover:text-gray-700 mt-4"
@@ -413,13 +709,13 @@ export default function Chatbot({ openChat = false, conversationId }: ChatbotPro
             </div>
             
             <div className="flex items-center space-x-3 relative z-10">
-              <button
+            <button
                 onClick={handleCloseChat}
                 className="p-2 hover:bg-white hover:bg-opacity-20 rounded-full transition-colors"
                 title="Close Chat"
-              >
+            >
                 <X className="h-6 w-6" />
-              </button>
+            </button>
             </div>
           </div>
 
@@ -452,14 +748,34 @@ export default function Chatbot({ openChat = false, conversationId }: ChatbotPro
                           : "Create an account to save and access your conversations"
                         }
                       </p>
+                      {/* Debug info */}
+                      <p className="text-xs text-gray-500 mt-1">
+                        Auth Status: {isAuthenticated ? '✅ Logged In' : '❌ Not Logged In'}
+                      </p>
                     </div>
                   </div>
-                  <button
-                    onClick={handleSaveToAccount}
-                    className="bg-blue-600 text-white px-5 py-3 rounded-xl hover:bg-blue-700 transition-all duration-200 text-sm font-medium shadow-lg hover:shadow-xl mt-3 w-full"
-                  >
-                    {isAuthenticated ? 'Send Transcript' : 'Save to Account'}
-                  </button>
+                  <div className="space-y-2 mt-3">
+                    <div className="flex space-x-2">
+                      <button
+                        onClick={handleSaveToAccount}
+                        className="flex-1 bg-blue-600 text-white px-3 py-2 rounded-lg hover:bg-blue-700 transition-all duration-200 text-xs font-medium shadow-lg hover:shadow-xl"
+                      >
+                        {isAuthenticated ? 'Save to Account' : 'Login & Save'}
+                      </button>
+                      <button
+                        onClick={handleEmailTranscript}
+                        className="flex-1 bg-green-600 text-white px-3 py-2 rounded-lg hover:bg-green-700 transition-all duration-200 text-xs font-medium shadow-lg hover:shadow-xl"
+                      >
+                        Email Transcript
+                      </button>
+                    </div>
+                    <button
+                      onClick={handleSaveAndClose}
+                      className="w-full bg-gray-600 text-white px-3 py-2 rounded-lg hover:bg-gray-700 transition-all duration-200 text-xs font-medium shadow-lg hover:shadow-xl"
+                    >
+                      Save & Close
+                    </button>
+                  </div>
                 </div>
               </div>
             )}
@@ -473,7 +789,7 @@ export default function Chatbot({ openChat = false, conversationId }: ChatbotPro
               >
                 <div
                   className={`max-w-[75%] p-5 rounded-2xl shadow-lg transition-all duration-300 hover:shadow-xl ${
-                    message.sender === 'user'
+                      message.sender === 'user'
                       ? 'bg-gradient-to-br from-blue-600 to-blue-700 text-white border-2 border-blue-500'
                       : 'bg-gradient-to-br from-white to-gray-50 text-gray-900 border-2 border-gray-200'
                   }`}
@@ -550,7 +866,7 @@ export default function Chatbot({ openChat = false, conversationId }: ChatbotPro
                 </div>
               </div>
             ))}
-
+            
             {/* Info message about transcript feature */}
             {messages.length === 1 && (
               <div className="flex justify-start mb-4 animate-fade-in">
@@ -558,11 +874,11 @@ export default function Chatbot({ openChat = false, conversationId }: ChatbotPro
                   <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-blue-500 to-indigo-600"></div>
                   <div className="flex items-start space-x-3">
                     <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center flex-shrink-0">
-                      <span className="text-white text-lg">💡</span>
+                      <span className="text-white text-lg">🎯</span>
                     </div>
                     <div className="flex-1">
                       <p className="text-sm text-blue-800 leading-relaxed">
-                        <strong className="font-semibold text-blue-900">Pro Tip:</strong> After our conversation, you can save it to your account or get a transcript sent to your email for future reference.
+                        <strong className="font-semibold text-blue-900">Smart Planning:</strong> I'll ask just the essential questions to create your personalized investment strategy. Your complete plan will be ready in just a few minutes!
                       </p>
                     </div>
                   </div>
@@ -577,14 +893,35 @@ export default function Chatbot({ openChat = false, conversationId }: ChatbotPro
                   <div className="flex items-center space-x-3">
                     <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center">
                       <Bot className="h-4 w-4 text-white animate-pulse" />
-                    </div>
+                  </div>
                     <div className="flex-1">
                       <p className="text-sm font-medium text-blue-800 mb-2">InvestRight Advisor is typing...</p>
-                      <div className="flex space-x-1">
+                    <div className="flex space-x-1">
                         <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce"></div>
                         <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
                         <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
                       </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+            
+            {/* Investment Plan Generation Indicator */}
+            {isGeneratingPlan && (
+              <div className="flex justify-start mb-4 animate-fade-in">
+                <div className="bg-gradient-to-br from-green-50 to-emerald-50 border-2 border-green-200 p-5 rounded-2xl shadow-lg max-w-[75%]">
+                  <div className="flex items-center space-x-3">
+                    <div className="w-8 h-8 bg-gradient-to-br from-green-500 to-emerald-600 rounded-full flex items-center justify-center">
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-sm font-bold text-green-800 mb-1">📊 Creating Your Investment Strategy...</p>
+                      <p className="text-xs text-green-700 mb-2">Analyzing your goals and financial capacity to build a personalized plan</p>
+                      <div className="bg-green-100 rounded-full h-2 overflow-hidden">
+                        <div className="bg-gradient-to-r from-green-400 to-emerald-500 h-full rounded-full animate-pulse" style={{ width: '85%' }}></div>
+                      </div>
+                      <p className="text-xs text-green-600 mt-1">Calculating optimal investment allocation and timeline...</p>
                     </div>
                   </div>
                 </div>
@@ -596,25 +933,31 @@ export default function Chatbot({ openChat = false, conversationId }: ChatbotPro
 
           {/* Input */}
           <div className="p-6 border-t border-gray-200 bg-white">
-            {/* Send Transcript Button */}
+            {/* Quick Action Buttons */}
             {messages.length > 1 && (
-              <div className="mb-4 flex justify-center">
+              <div className="mb-4 flex justify-center space-x-3">
                 <button
                   onClick={handleSaveToAccount}
-                  className={`flex items-center space-x-3 px-6 py-3 rounded-xl transition-all duration-200 text-sm font-medium shadow-lg hover:shadow-xl ${
-                    emailSubmitted
-                      ? 'bg-green-600 text-white hover:bg-green-700'
-                      : 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:from-blue-700 hover:to-indigo-700'
+                  className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-all duration-200 text-sm font-medium shadow-lg hover:shadow-xl ${
+                    'bg-blue-600 text-white hover:bg-blue-700'
                   }`}
                 >
-                  <Mail className="h-5 w-5" />
+                  <User className="h-4 w-4" />
                   <span>
-                    {emailSubmitted
-                      ? 'Update Email'
-                      : isAuthenticated
-                        ? 'Send Transcript to Email'
-                        : 'Save to Account'
-                    }
+                    {isAuthenticated ? 'Save to Account' : 'Login & Save'}
+                  </span>
+                </button>
+                <button
+                  onClick={handleEmailTranscript}
+                  className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-all duration-200 text-sm font-medium shadow-lg hover:shadow-xl ${
+                    emailSubmitted
+                      ? 'bg-green-600 text-white hover:bg-green-700'
+                      : 'bg-green-600 text-white hover:bg-green-700'
+                  }`}
+                >
+                  <Mail className="h-4 w-4" />
+                  <span>
+                    {emailSubmitted ? 'Update Email' : 'Email Transcript'}
                   </span>
                 </button>
               </div>
@@ -622,25 +965,30 @@ export default function Chatbot({ openChat = false, conversationId }: ChatbotPro
 
             <div className="flex space-x-3">
               <div className="flex-1 relative">
-                <input
-                  type="text"
-                  value={inputValue}
-                  onChange={(e) => setInputValue(e.target.value)}
-                  onKeyPress={handleKeyPress}
-                  placeholder={isTyping ? "AI is typing..." : t.chatbot.placeholder}
-                  disabled={isTyping}
-                  className="w-full px-5 py-4 border-2 border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-50 text-sm transition-all duration-200 bg-white hover:border-gray-400"
-                />
+              <input
+                ref={inputRef}
+                type="text"
+                value={inputValue}
+                onChange={(e) => setInputValue(e.target.value)}
+                onKeyPress={handleKeyPress}
+                placeholder={isTyping ? "AI is typing..." : isGeneratingPlan ? "Creating your investment strategy..." : t.chatbot.placeholder}
+                disabled={isTyping || isGeneratingPlan}
+                className="w-full px-5 py-4 border-2 border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:opacity-50 text-sm transition-all duration-200 bg-white hover:border-gray-400"
+              />
                 <div className="absolute inset-y-0 right-3 flex items-center">
                   <div className="w-2 h-2 bg-gray-400 rounded-full animate-pulse"></div>
                 </div>
               </div>
               <button
                 onClick={handleSendMessage}
-                disabled={!inputValue.trim() || isTyping}
+                disabled={!inputValue.trim() || isTyping || isGeneratingPlan}
                 className="px-6 py-4 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl hover:from-blue-700 hover:to-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 font-medium shadow-lg hover:shadow-xl transform hover:scale-105 active:scale-95"
               >
-                <Send className="h-5 w-5" />
+                {isGeneratingPlan ? (
+                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                ) : (
+                  <Send className="h-5 w-5" />
+                )}
               </button>
             </div>
           </div>
