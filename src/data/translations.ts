@@ -10,9 +10,9 @@ export const translations: Record<string, LanguageContent> = {
       getStarted: "Get Started"
     },
     hero: {
-      title: "Smart Investing for Small Investors",
+      title: "Advice Beyond Returns, Toward Life Goals.",
       subtitle: "",
-      description: "Invest Right is your neutral platform for making informed investment decisions. Get personalized guidance, explore diverse options, and grow your wealth with confidence.",
+              description: "Your Dream Life is more than just returns — it needs an unbiased advisor who helps you grow income, build better habits, and achieve every life goal. That's why we created InvestRight: your personal guide to Life Goals, not just investments.",
       startInvesting: "Start Your Journey",
       learnMore: "How It Works",
       secureRegulated: "Completely Unbiased",
@@ -23,31 +23,31 @@ export const translations: Record<string, LanguageContent> = {
       lowFeesDesc: "Personalized investment plans crafted just for you"
     },
     features: {
-      title: "Everything You Need for Smart Investing",
+      title: "What's so Special about us?",
       description: "Our platform provides all the tools and resources necessary to make informed investment decisions.",
       calculator: {
-        title: "Investment Calculator",
-        description: "Plan your investments with our advanced calculators and projection tools."
+        title: "Chat-based AI Advisor – Human-like guidance you can trust",
+        description: "Get personalized financial advice and guidance through our intelligent AI chatbot that understands your goals and provides human-like support."
       },
       portfolio: {
-        title: "Portfolio Analysis",
-        description: "Get detailed insights into your portfolio performance and risk assessment."
+        title: "Holistic Life Goal Planning – Beyond investments, covering habits, skills & income",
+        description: "Comprehensive planning that goes beyond traditional investing to help you develop better financial habits, enhance your skills, and increase your income for long-term success."
       },
       education: {
-        title: "Educational Resources",
-        description: "Access comprehensive guides and tutorials for investment education."
+        title: "Unbiased Financial Advice – Real advice, not commission-driven",
+        description: "Get genuine financial guidance that puts your interests first, not driven by sales commissions or product promotions."
       },
       research: {
-        title: "Market Research",
-        description: "Stay informed with real-time market data and expert analysis."
+        title: "Personalized Strategies – Tailored to your age, income & risk profile",
+        description: "Get investment strategies that are specifically designed for your unique financial situation, life stage, and personal risk tolerance."
       },
       risk: {
-        title: "Risk Management",
-        description: "Understand and manage investment risks with our assessment tools."
+        title: "Dream Goal Tracker – Achieve education, home, retirement & lifestyle dreams",
+        description: "Track and achieve your biggest life goals including education funding, home ownership, comfortable retirement, and lifestyle aspirations."
       },
       execution: {
-        title: "Quick Execution",
-        description: "Execute trades quickly and efficiently with our streamlined platform."
+        title: "Smart Income Growth Tips – Build primary & secondary income streams",
+        description: "Learn strategies to increase your earning potential through career advancement, side hustles, and smart investment decisions."
       }
     },
     investmentOptions: {
@@ -223,9 +223,9 @@ export const translations: Record<string, LanguageContent> = {
       getStarted: "शुरू करें"
     },
     hero: {
-      title: "छोटे निवेशकों के लिए स्मार्ट निवेश",
+      title: "रिटर्न से परे सलाह, जीवन लक्ष्यों की ओर।",
       subtitle: "",
-      description: "इन्वेस्ट राइट आपका तटस्थ प्लेटफॉर्म है सूचित निवेश निर्णय लेने के लिए। व्यक्तिगत मार्गदर्शन प्राप्त करें, विविध विकल्पों का अन्वेषण करें, और आत्मविश्वास के साथ अपनी संपत्ति बढ़ाएं।",
+              description: "आपका सपनों का जीवन सिर्फ रिटर्न से कहीं अधिक है — इसे एक निष्पक्ष सलाहकार की आवश्यकता है जो आपकी आय बढ़ाने, बेहतर आदतें बनाने और हर जीवन लक्ष्य को हासिल करने में मदद करे। इसीलिए हमने InvestRight बनाया: आपका जीवन लक्ष्यों का व्यक्तिगत गाइड, सिर्फ निवेश नहीं।",
       startInvesting: "अपनी यात्रा शुरू करें",
       learnMore: "यह कैसे काम करता है",
       secureRegulated: "पूर्णतः निष्पक्ष",
@@ -236,31 +236,31 @@ export const translations: Record<string, LanguageContent> = {
       lowFeesDesc: "आपके लिए विशेष रूप से तैयार किए गए व्यक्तिगत निवेश योजनाएं"
     },
     features: {
-      title: "स्मार्ट निवेश के लिए आपको जो कुछ भी चाहिए",
+      title: "हमारे बारे में क्या खास है?",
       description: "हमारा प्लेटफॉर्म सूचित निवेश निर्णय लेने के लिए आवश्यक सभी उपकरण और संसाधन प्रदान करता है।",
       calculator: {
         title: "निवेश कैलकुलेटर",
         description: "हमारे उन्नत कैलकुलेटर और प्रक्षेपण उपकरणों के साथ अपने निवेश की योजना बनाएं।"
       },
       portfolio: {
-        title: "पोर्टफोलियो विश्लेषण",
-        description: "अपने पोर्टफोलियो के प्रदर्शन और जोखिम मूल्यांकन में विस्तृत अंतर्दृष्टि प्राप्त करें।"
+        title: "समग्र जीवन लक्ष्य योजना – निवेश से परे, आदतों, कौशल और आय को कवर करना",
+        description: "व्यापक योजना जो पारंपरिक निवेश से परे जाती है ताकि आपको बेहतर वित्तीय आदतें विकसित करने, अपने कौशल को बढ़ाने और दीर्घकालिक सफलता के लिए अपनी आय बढ़ाने में मदद मिल सके।"
       },
       education: {
-        title: "शैक्षिक संसाधन",
-        description: "निवेश शिक्षा के लिए व्यापक गाइड और ट्यूटोरियल तक पहुंच प्राप्त करें।"
+        title: "निष्पक्ष वित्तीय सलाह – वास्तविक सलाह, कमीशन-संचालित नहीं",
+        description: "वास्तविक वित्तीय मार्गदर्शन प्राप्त करें जो आपके हितों को पहले रखता है, बिक्री कमीशन या उत्पाद प्रचार से प्रेरित नहीं।"
       },
       research: {
-        title: "बाजार अनुसंधान",
-        description: "रियल-टाइम बाजार डेटा और विशेषज्ञ विश्लेषण के साथ सूचित रहें।"
+        title: "व्यक्तिगत रणनीतियां – आपकी उम्र, आय और जोखिम प्रोफाइल के अनुरूप",
+        description: "ऐसी निवेश रणनीतियां प्राप्त करें जो विशेष रूप से आपकी अनूठी वित्तीय स्थिति, जीवन के चरण और व्यक्तिगत जोखिम सहनशीलता के लिए डिज़ाइन की गई हैं।"
       },
       risk: {
-        title: "जोखिम प्रबंधन",
-        description: "हमारे मूल्यांकन उपकरणों के साथ निवेश जोखिमों को समझें और प्रबंधित करें।"
+        title: "सपने लक्ष्य ट्रैकर – शिक्षा, घर, सेवानिवृत्ति और जीवनशैली के सपने हासिल करें",
+        description: "शिक्षा फंडिंग, घर की स्वामित्व, आरामदायक सेवानिवृत्ति और जीवनशैली की आकांक्षाओं सहित अपने सबसे बड़े जीवन लक्ष्यों को ट्रैक करें और हासिल करें।"
       },
       execution: {
-        title: "त्वरित निष्पादन",
-        description: "हमारे सुव्यवस्थित प्लेटफॉर्म के साथ तेजी से और कुशलता से ट्रेड निष्पादित करें।"
+        title: "स्मार्ट आय वृद्धि टिप्स – प्राथमिक और द्वितीयक आय धाराएं बनाएं",
+        description: "करियर में उन्नति, साइड हसल्स और स्मार्ट निवेश निर्णयों के माध्यम से अपनी कमाई की क्षमता बढ़ाने की रणनीतियां सीखें।"
       }
     },
     investmentOptions: {
@@ -303,6 +303,49 @@ export const translations: Record<string, LanguageContent> = {
       averageFee: "औसत शुल्क",
       userRating: "उपयोगकर्ता रेटिंग",
       startJourney: "अपनी यात्रा शुरू करें",
+      ourStory: {
+        title: "हमारी कहानी",
+        subtitle: "विनम्र शुरुआत से दुनिया भर के लाखों छोटे निवेशकों को सशक्त बनाने तक। उस यात्रा की खोज करें जिसने इन्वेस्ट राइट को आज का विश्वसनीय प्लेटफॉर्म बनाया।",
+        missionTitle: "हमारा मिशन",
+        missionText: "हमारा मानना है कि स्मार्ट निवेश केवल धनी लोगों तक सीमित नहीं होना चाहिए। हमारा मिशन पेशेवर-ग्रेड निवेश उपकरणों को लोकतांत्रिक बनाना और उन्हें सभी के लिए सुलभ बनाना है।",
+        missionText2: "कटिंग-एज तकनीक को वित्तीय विशेषज्ञता के साथ जोड़कर, हम एक ऐसा भविष्य बना रहे हैं जहां हर व्यक्ति सूचित निवेश निर्णय ले सकता है और स्थायी धन बना सकता है।",
+        missionCardTitle: "छोटे निवेशकों को सशक्त बनाना",
+        missionCardText: "पेशेवर निवेश उपकरणों को सभी के लिए सुलभ बनाना",
+        journeyTitle: "हमारी यात्रा",
+        journeySubtitle: "मुख्य मील के पत्थर जिन्होंने हमें एक विश्वसनीय निवेश प्लेटफॉर्म बनने का मार्ग प्रशस्त किया",
+        year2020Title: "शुरुआत",
+        year2020Text: "निवेश को लोकतांत्रिक बनाने के दृष्टिकोण के साथ स्थापित। वित्तीय विशेषज्ञों और तकनीशियनों की एक छोटी टीम के साथ शुरू किया।",
+        year2021Title: "पहला प्लेटफॉर्म लॉन्च",
+        year2021Text: "छोटे निवेशकों के लिए बुनियादी उपकरणों और शैक्षिक संसाधनों के साथ हमारा पहला निवेश प्लेटफॉर्म लॉन्च किया।",
+        year2022Title: "AI एकीकरण",
+        year2022Text: "AI-संचालित निवेश सलाह और पोर्टफोलियो विश्लेषण उपकरण पेश किए, जिससे पेशेवर मार्गदर्शन सभी के लिए सुलभ हो गया।",
+        year2023Title: "वैश्विक विस्तार",
+        year2023Text: "कई देशों में विस्तार किया और दुनिया भर के निवेशकों की सेवा के लिए बहु-भाषा समर्थन पेश किया।",
+        year2024Title: "नवाचार नेता",
+        year2024Text: "उन्नत उपकरणों, व्यापक शिक्षा और सशक्त निवेशकों के बढ़ते समुदाय के साथ एक अग्रणी फिनटेक प्लेटफॉर्म के रूप में मान्यता प्राप्त।",
+        valuesTitle: "हमारे मूल मूल्य",
+        valuesSubtitle: "वे सिद्धांत जो हमारे सभी कार्यों का मार्गदर्शन करते हैं",
+        transparencyTitle: "पारदर्शिता",
+        transparencyText: "हम अपने सभी कार्यों और शुल्कों में पूर्ण पारदर्शिता में विश्वास करते हैं।",
+        careTitle: "देखभाल",
+        careText: "हम वास्तव में अपने उपयोगकर्ताओं की वित्तीय सफलता और कल्याण की परवाह करते हैं।",
+        innovationTitle: "नवाचार",
+        innovationText: "सर्वोत्तम उपकरण और अनुभव प्रदान करने के लिए लगातार नवाचार कर रहे हैं।",
+        accessibilityTitle: "सुलभता",
+        accessibilityText: "पेशेवर उपकरणों को सभी के लिए, हर जगह सुलभ बनाना।",
+        teamTitle: "हमारी टीम से मिलें",
+        teamSubtitle: "छोटे निवेशकों को सशक्त बनाने के लिए समर्पित जुनूनी विशेषज्ञ",
+        team1Name: "वित्तीय विशेषज्ञ",
+        team1Desc: "निवेश प्रबंधन में दशकों के अनुभव वाले प्रमाणित वित्तीय सलाहकार।",
+        team2Name: "तकनीकी टीम",
+        team2Desc: "कटिंग-एज निवेश उपकरण बनाने वाले नवीन डेवलपर्स और इंजीनियर।",
+        team3Name: "ग्राहक सफलता",
+        team3Desc: "समर्पित सहायता टीम यह सुनिश्चित करती है कि हर उपयोगकर्ता को आवश्यक सहायता मिले।",
+        ctaTitle: "हमारी कहानी में शामिल हों",
+        ctaText: "उस क्रांति का हिस्सा बनें जो पेशेवर निवेश को सभी के लिए सुलभ बना रही है। आज ही हमारे साथ अपनी निवेश यात्रा शुरू करें।",
+        ctaButton1: "अपनी यात्रा शुरू करें",
+        ctaButton2: "संपर्क करें"
+      },
       communityFocused: {
         title: "समुदाय केंद्रित",
         description: "निवेशकों का एक सहायक समुदाय बनाना।"
@@ -345,9 +388,9 @@ export const translations: Record<string, LanguageContent> = {
         "निवेश योजना के बारे में यह एक बेहतरीन सवाल है! आपकी स्थिति के आधार पर, मैं स्टॉक और बॉन्ड दोनों को शामिल करने वाले विविधीकृत पोर्टफोलियो से शुरुआत करने की सलाह दूंगा।",
         "छोटे निवेशकों के लिए, इंडेक्स फंड अक्सर कम फीस और अंतर्निहित विविधीकरण के कारण एक उत्कृष्ट विकल्प होते हैं। आपकी निवेश समयसीमा क्या है?",
         "निवेश योजना में जोखिम सहनशीलता महत्वपूर्ण है। आम तौर पर, युवा निवेशक संभावित रूप से उच्च रिटर्न के लिए अधिक जोखिम उठा सकते हैं। बाजार की अस्थिरता के साथ आप कितने सहज हैं?",
-        "डॉलर-कॉस्ट एवरेजिंग शुरुआती लोगों के लिए एक स्मार्ट रणनीति है। इसमें बाजार की स्थितियों की परवाह किए बिना नियमित रूप से एक निश्चित राशि का निवेश करना शामिल है। यह बाजार की अस्थिरता के प्रभाव को कम करने में मदद करता है।",
-        "आपातकालीन फंड में आमतौर पर निवेश से पहले 3-6 महीने के खर्च को कवर करना चाहिए। यह सुनिश्चित करता है कि बाजार में गिरावट के दौरान आपको निवेश वापस लेने की आवश्यकता नहीं होगी।",
-        "कर-लाभकारी खातों जैसे PPF और ELSS को आमतौर पर प्राथमिकता दी जानी चाहिए। क्या आप किसी नियोक्ता मैचिंग कार्यक्रम का लाभ उठा रहे हैं?"
+        "डॉलर-कॉस्ट अॅव्हरेजिंग शुरुआती लोगों के लिए एक स्मार्ट रणनीति है। इसमें बाजार की स्थितियों की परवाह किए बिना नियमित रूप से एक निश्चित राशि का निवेश करना शामिल है। यह बाजार की अस्थिरता के प्रभाव को कम करने में मदद करता है।",
+        "आपत्कालीन फंड में सामान्यतः निवेश से पहले 3-6 महीने के खर्च को कव्हर केला पाहिजे। हे सुनिश्चित करते की बाजारातील मंदीच्या काळात तुम्हाला गुंतवणूक काढण्याची गरज भासणार नाही।",
+        "कर-लाभकारी खातों जैसे PPF और ELSS को सामान्यतः प्राधान्य दिले पाहिजे। क्या आप किसी नियोक्ता मैचिंग कार्यक्रम का लाभ उठा रहे हैं?"
       ]
     },
     login: {

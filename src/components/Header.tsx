@@ -63,7 +63,7 @@ export default function Header() {
                     <span className="text-xl font-bold text-green-600 -mt-1">Right</span>
                   </div>
                 </div>
-              </div>
+            </div>
             </Link>
           </div>
 
@@ -146,7 +146,7 @@ export default function Header() {
                 to="/"
                 className="bg-blue-700 text-white px-6 py-2 rounded-lg hover:bg-blue-800 transition-colors font-medium"
               >
-                {t.header.getStarted}
+              {t.header.getStarted}
               </Link>
             )}
           </nav>
@@ -236,7 +236,7 @@ export default function Header() {
                   to="/"
                   className="bg-blue-700 text-white px-6 py-2 rounded-lg hover:bg-blue-800 transition-colors font-medium w-full text-center"
                 >
-                  {t.header.getStarted}
+                {t.header.getStarted}
                 </Link>
               )}
             </nav>

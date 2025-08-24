@@ -277,6 +277,170 @@ class ChatService {
       return [];
     }
   }
+
+  // Admin method: Get all conversations from all users
+  async getAllConversations(): Promise<{ success: boolean; conversations?: any[]; error?: string }> {
+    try {
+      if (!supabase) {
+        throw new Error('Supabase not configured');
+      }
+
+      // Get all unique conversation IDs with user info
+      const { data: conversationData, error: convError } = await supabase
+        .from('chat_messages')
+        .select('conversation_id, user_email, timestamp')
+        .order('timestamp', { ascending: false });
+
+      if (convError) {
+        console.error('Error getting all conversations:', convError);
+        return { success: false, error: convError.message };
+      }
+
+      if (!conversationData || conversationData.length === 0) {
+        return { success: true, conversations: [] };
+      }
+
+      // Group by conversation ID and get unique conversations
+      const conversationMap = new Map();
+      
+      conversationData.forEach(item => {
+        if (!conversationMap.has(item.conversation_id)) {
+          conversationMap.set(item.conversation_id, {
+            id: item.conversation_id,
+            user_email: item.user_email,
+            first_message_time: item.timestamp
+          });
+        }
+      });
+
+      const conversations = [];
+
+      // Get detailed info for each conversation
+      for (const [convId, convInfo] of conversationMap) {
+        const { data: messages, error: msgError } = await supabase
+          .from('chat_messages')
+          .select('*')
+          .eq('conversation_id', convId)
+          .order('timestamp', { ascending: true });
+
+        if (msgError) {
+          console.error('Error getting messages for conversation:', convId, msgError);
+          continue;
+        }
+
+        if (messages && messages.length > 0) {
+          const firstMessage = messages[0];
+          const lastMessage = messages[messages.length - 1];
+          
+          // Generate title from first user message
+          let title = 'Investment Discussion';
+          const firstUserMessage = messages.find(m => m.sender === 'user');
+          if (firstUserMessage) {
+            title = firstUserMessage.message_text.length > 50 
+              ? firstUserMessage.message_text.substring(0, 50) + '...'
+              : firstUserMessage.message_text;
+          }
+
+          // Generate summary from conversation
+          const summary = this.generateConversationSummary(messages);
+
+          conversations.push({
+            id: convId,
+            user_email: convInfo.user_email,
+            title,
+            summary,
+            message_count: messages.length,
+            created_at: new Date(firstMessage.timestamp),
+            last_message_at: new Date(lastMessage.timestamp),
+            messages: messages // Include all messages for admin view
+          });
+        }
+      }
+
+      // Sort by last message date (newest first)
+      conversations.sort((a, b) => b.last_message_at.getTime() - a.last_message_at.getTime());
+
+      return { success: true, conversations };
+    } catch (error) {
+      console.error('Error in getAllConversations:', error);
+      return { 
+        success: false, 
+        error: error instanceof Error ? error.message : 'Unknown error' 
+      };
+    }
+  }
+
+  // Admin method: Get conversation stats
+  async getConversationStats(): Promise<{ success: boolean; stats?: any; error?: string }> {
+    try {
+      if (!supabase) {
+        throw new Error('Supabase not configured');
+      }
+
+      // Get total conversation count
+      const { data: conversations, error: convError } = await supabase
+        .from('chat_messages')
+        .select('conversation_id')
+        .order('timestamp', { ascending: false });
+
+      if (convError) {
+        return { success: false, error: convError.message };
+      }
+
+      const uniqueConversations = [...new Set(conversations?.map(c => c.conversation_id) || [])];
+      
+      // Get total message count
+      const { count: totalMessages, error: msgError } = await supabase
+        .from('chat_messages')
+        .select('*', { count: 'exact', head: true });
+
+      if (msgError) {
+        return { success: false, error: msgError.message };
+      }
+
+      // Get unique users count
+      const { data: users, error: userError } = await supabase
+        .from('chat_messages')
+        .select('user_email');
+
+      if (userError) {
+        return { success: false, error: userError.message };
+      }
+
+      const uniqueUsers = [...new Set(users?.map(u => u.user_email) || [])];
+
+      // Get conversations from last 7 days
+      const weekAgo = new Date();
+      weekAgo.setDate(weekAgo.getDate() - 7);
+      
+      const { data: recentConversations, error: recentError } = await supabase
+        .from('chat_messages')
+        .select('conversation_id')
+        .gte('timestamp', weekAgo.toISOString());
+
+      if (recentError) {
+        return { success: false, error: recentError.message };
+      }
+
+      const recentUniqueConversations = [...new Set(recentConversations?.map(c => c.conversation_id) || [])];
+
+      return {
+        success: true,
+        stats: {
+          totalConversations: uniqueConversations.length,
+          totalMessages: totalMessages || 0,
+          uniqueUsers: uniqueUsers.length,
+          conversationsThisWeek: recentUniqueConversations.length
+        }
+      };
+    } catch (error) {
+      console.error('Error in getConversationStats:', error);
+      return { 
+        success: false, 
+        error: error instanceof Error ? error.message : 'Unknown error' 
+      };
+    }
+  }
 }
 
 // Create and export a singleton instance

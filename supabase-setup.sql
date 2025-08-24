@@ -11,14 +11,14 @@ CREATE TABLE IF NOT EXISTS contact_submissions (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- 2. Create chat_messages table
+-- 2. Create chat_messages table with improved structure
 CREATE TABLE IF NOT EXISTS chat_messages (
   id SERIAL PRIMARY KEY,
-  user_email VARCHAR(255),
+  user_email VARCHAR(255) NOT NULL,
   message_text TEXT NOT NULL,
   sender VARCHAR(50) NOT NULL CHECK (sender IN ('user', 'bot')),
   timestamp TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  conversation_id VARCHAR(255)
+  conversation_id VARCHAR(255) NOT NULL
 );
 
 -- 3. Create chat_transcripts table for email functionality
@@ -46,12 +46,12 @@ ON chat_messages FOR INSERT WITH CHECK (true);
 CREATE POLICY "Allow public inserts on chat_transcripts" 
 ON chat_transcripts FOR INSERT WITH CHECK (true);
 
--- 6. Create policies for reading (optional - for admin purposes)
+-- 6. Create policies for reading (users can only see their own messages)
 CREATE POLICY "Allow public read on contact_submissions" 
 ON contact_submissions FOR SELECT USING (true);
 
-CREATE POLICY "Allow public read on chat_messages" 
-ON chat_messages FOR SELECT USING (true);
+CREATE POLICY "Allow users to read their own chat messages" 
+ON chat_messages FOR SELECT USING (auth.jwt() ->> 'email' = user_email);
 
 CREATE POLICY "Allow public read on chat_transcripts" 
 ON chat_transcripts FOR SELECT USING (true);
@@ -63,6 +63,7 @@ CREATE INDEX IF NOT EXISTS idx_contact_submissions_created_at ON contact_submiss
 CREATE INDEX IF NOT EXISTS idx_chat_messages_user_email ON chat_messages(user_email);
 CREATE INDEX IF NOT EXISTS idx_chat_messages_timestamp ON chat_messages(timestamp);
 CREATE INDEX IF NOT EXISTS idx_chat_messages_conversation_id ON chat_messages(conversation_id);
+CREATE INDEX IF NOT EXISTS idx_chat_messages_sender ON chat_messages(sender);
 
 CREATE INDEX IF NOT EXISTS idx_chat_transcripts_user_email ON chat_transcripts(user_email);
 CREATE INDEX IF NOT EXISTS idx_chat_transcripts_created_at ON chat_transcripts(created_at);
@@ -93,7 +94,29 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- 10. Verify tables were created
+-- 10. Create a function to get user conversations
+CREATE OR REPLACE FUNCTION get_user_conversations(user_email_param VARCHAR)
+RETURNS TABLE (
+  conversation_id VARCHAR,
+  message_count BIGINT,
+  first_message_time TIMESTAMP WITH TIME ZONE,
+  last_message_time TIMESTAMP WITH TIME ZONE
+) AS $$
+BEGIN
+  RETURN QUERY
+  SELECT 
+    cm.conversation_id,
+    COUNT(*) as message_count,
+    MIN(cm.timestamp) as first_message_time,
+    MAX(cm.timestamp) as last_message_time
+  FROM chat_messages cm
+  WHERE cm.user_email = user_email_param
+  GROUP BY cm.conversation_id
+  ORDER BY MAX(cm.timestamp) DESC;
+END;
+$$ LANGUAGE plpgsql;
+
+-- 11. Verify tables were created
 SELECT 
   table_name, 
   table_type 
@@ -102,7 +125,7 @@ WHERE table_schema = 'public'
   AND table_name IN ('contact_submissions', 'chat_messages', 'chat_transcripts')
 ORDER BY table_name;
 
--- 11. Show table structure
+-- 12. Show table structure
 \d contact_submissions;
 \d chat_messages;
 \d chat_transcripts;

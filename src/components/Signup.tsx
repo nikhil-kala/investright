@@ -31,6 +31,7 @@ export default function Signup() {
 
   // Get the intended destination from location state, or default to dashboard
   const from = (location.state as any)?.from?.pathname || '/dashboard';
+  const returnToChat = (location.state as any)?.returnToChat;
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -144,6 +145,7 @@ export default function Signup() {
         navigate('/login', { 
           state: { 
             from: from,
+            returnToChat: returnToChat, // Pass through the returnToChat state
             message: 'Account created successfully with User role! Please log in with your new credentials.' 
           } 
         });

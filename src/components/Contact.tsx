@@ -114,14 +114,22 @@ const Contact: React.FC = () => {
               </div>
             </div>
 
-            {/* Map Placeholder */}
-            <div className="bg-gray-200 rounded-lg h-64 flex items-center justify-center">
-              <div className="text-center text-gray-500">
-                <MapPin className="h-12 w-12 mx-auto mb-2" />
-                <p className="text-sm">Map will be displayed here</p>
-                <p className="text-xs">A106, World Of Mother, Akurdi, Pune</p>
-              </div>
+            {/* Google Maps - Hidden as requested */}
+            {/* 
+            <div className="rounded-lg overflow-hidden shadow-lg">
+              <iframe 
+                src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3780.349308550257!2d73.77971248193175!3d18.64831473727079!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3bc2b9dbbfffffff%3A0x43f6def612a3f49d!2sAkurdi%2C%20Pune%2C%20Maharashtra%2C%20India!5e0!3m2!1sen!2sin!4v1755864957739!5m2!1sen!2sin" 
+                width="100%" 
+                height="400" 
+                style={{border:0}} 
+                allowFullScreen 
+                loading="lazy" 
+                referrerPolicy="no-referrer-when-downgrade"
+                title="InvestRight Office Location - Akurdi, Pune"
+                className="w-full h-64"
+              ></iframe>
             </div>
+            */}
           </div>
 
           {/* Contact Form */}

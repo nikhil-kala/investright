@@ -25,6 +25,7 @@ export default function Login() {
   // Get the intended destination from location state, or default to dashboard
   const from = (location.state as any)?.from?.pathname || '/dashboard';
   const message = (location.state as any)?.message;
+  const returnToChat = (location.state as any)?.returnToChat;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -38,8 +39,14 @@ export default function Login() {
       });
 
       if (result.success) {
-        // Always redirect to dashboard after successful login
-        navigate('/dashboard', { replace: true });
+        // Redirect based on the intended destination
+        if (returnToChat) {
+          // Return to home page with chat open
+          navigate('/', { state: { openChat: true }, replace: true });
+        } else {
+          // Default to dashboard
+          navigate('/dashboard', { replace: true });
+        }
       } else {
         setError(result.message);
       }

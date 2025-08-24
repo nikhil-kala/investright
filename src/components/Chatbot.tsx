@@ -21,6 +21,9 @@ interface ChatbotProps {
 export default function Chatbot({ openChat = false, conversationId }: ChatbotProps) {
   const { t } = useLanguage();
   const navigate = useNavigate();
+  
+  // Debug: Log component render
+  console.log('🔄 Chatbot component rendered/re-rendered');
 
   const [isOpen, setIsOpen] = useState(false);
   const [showEmailPopup, setShowEmailPopup] = useState(false);
@@ -51,9 +54,52 @@ export default function Chatbot({ openChat = false, conversationId }: ChatbotPro
     }, 100);
   };
 
+  // Helper function to save individual messages to localStorage
+  const saveMessageToLocalStorage = (message: Message) => {
+    try {
+      const existingMessages = JSON.parse(localStorage.getItem('currentChatMessages') || '[]');
+      const updatedMessages = [...existingMessages, message];
+      localStorage.setItem('currentChatMessages', JSON.stringify(updatedMessages));
+      console.log('Chatbot: Saved message to localStorage:', message.sender, message.text.substring(0, 50));
+    } catch (error) {
+      console.error('Error saving message to localStorage:', error);
+    }
+  };
+
+  // Helper function to save pending conversation for later database sync
+  const savePendingConversation = () => {
+    try {
+      if (messages.length > 0) {
+        const pendingConversation = {
+          messages: messages,
+          conversationId: currentConversationId || chatService.generateConversationId(),
+          timestamp: new Date().toISOString(),
+          isComplete: false
+        };
+        localStorage.setItem('pendingConversation', JSON.stringify(pendingConversation));
+        console.log('Chatbot: Saved pending conversation with', messages.length, 'messages');
+      }
+    } catch (error) {
+      console.error('Error saving pending conversation:', error);
+    }
+  };
+
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  // Debug: Log state changes
+  useEffect(() => {
+    console.log('📊 State update - showAuthOptions:', showAuthOptions);
+  }, [showAuthOptions]);
+
+  useEffect(() => {
+    console.log('📊 State update - isAuthenticated:', isAuthenticated);
+  }, [isAuthenticated]);
+
+  useEffect(() => {
+    console.log('📊 State update - messages.length:', messages.length);
+  }, [messages.length]);
 
   useEffect(() => {
     // Check authentication status
@@ -117,10 +163,12 @@ export default function Chatbot({ openChat = false, conversationId }: ChatbotPro
             };
             setMessages([initialMessage]);
             
-            // Store initial bot message in Supabase if user is authenticated
+            // Store initial bot message in database if authenticated, otherwise store locally
             if (isAuthenticated) {
               const currentUser = authService.getCurrentUser();
               if (currentUser) {
+                try {
+                  console.log('Chatbot: Storing initial bot message to database for authenticated user');
                 await chatService.storeMessage({
                   user_email: currentUser.email,
                   message_text: response.message,
@@ -128,7 +176,16 @@ export default function Chatbot({ openChat = false, conversationId }: ChatbotPro
                   timestamp: new Date(),
                   conversation_id: newConversationId
                 });
+                } catch (error) {
+                  console.error('Error storing initial bot message to database:', error);
+                  saveMessageToLocalStorage(initialMessage);
+                }
               }
+            } else {
+              // Store to localStorage for unauthenticated users
+              console.log('Chatbot: Storing initial bot message to localStorage for unauthenticated user');
+              saveMessageToLocalStorage(initialMessage);
+              savePendingConversation();
             }
           } else {
             // Fallback message if service fails
@@ -192,23 +249,36 @@ export default function Chatbot({ openChat = false, conversationId }: ChatbotPro
     }
   }, [conversationId, isAuthenticated]);
 
-  // Check for pending conversations after authentication
+    // Check for pending conversations after authentication and sync localStorage
   useEffect(() => {
-    if (isAuthenticated && messages.length > 1) {
+    if (isAuthenticated) {
       const pendingConversation = localStorage.getItem('pendingConversation');
       if (pendingConversation) {
         try {
           const pending = JSON.parse(pendingConversation);
-          // If this is the same conversation, save it to the user's account
-          if (pending.conversationId === currentConversationId) {
-            handleSavePendingConversation();
+          console.log('Chatbot: Found pending conversation:', pending);
+          
+          // Restore the conversation messages and state
+          if (pending.messages && pending.messages.length > 1) {
+            console.log('Chatbot: Restoring conversation with', pending.messages.length, 'messages');
+            setMessages(pending.messages);
+            setCurrentConversationId(pending.conversationId);
+            setEmailSubmitted(false); // Reset email state since user just logged in
+            
+            // Auto-save the restored conversation to the user's account
+            setTimeout(() => {
+              handleSavePendingConversation();
+            }, 1000); // Small delay to ensure state is updated
           }
         } catch (error) {
           console.error('Error parsing pending conversation:', error);
         }
+      } else {
+        // No pending conversation, but check for other localStorage messages to sync
+        syncLocalStorageToDatabase();
       }
     }
-  }, [isAuthenticated, messages.length, currentConversationId]);
+  }, [isAuthenticated]);
 
   const loadSpecificConversation = async (convId: number) => {
     if (!isAuthenticated) return;
@@ -258,11 +328,12 @@ export default function Chatbot({ openChat = false, conversationId }: ChatbotPro
     setInputValue('');
     setIsTyping(true);
 
-    // Store user message in Supabase if authenticated
+    // Store user message in database if authenticated, otherwise store locally
     if (isAuthenticated && currentConversationId) {
       const currentUser = authService.getCurrentUser();
       if (currentUser) {
         try {
+          console.log('Chatbot: Storing user message to database for authenticated user');
           await chatService.storeMessage({
             user_email: currentUser.email,
             message_text: inputValue,
@@ -271,9 +342,18 @@ export default function Chatbot({ openChat = false, conversationId }: ChatbotPro
             conversation_id: currentConversationId
           });
         } catch (error) {
-          console.error('Error storing user message:', error);
+          console.error('Error storing user message to database:', error);
+          // Fallback to localStorage if database fails
+          saveMessageToLocalStorage(userMessage);
         }
       }
+    } else {
+      // Store to localStorage for unauthenticated users
+      console.log('Chatbot: Storing user message to localStorage for unauthenticated user');
+      saveMessageToLocalStorage(userMessage);
+      
+      // Also store pending conversation for later database sync
+      savePendingConversation();
     }
 
     try {
@@ -309,15 +389,16 @@ export default function Chatbot({ openChat = false, conversationId }: ChatbotPro
           
           // Brief delay for UX then turn off loading
           setTimeout(() => {
-            setIsGeneratingPlan(false);
+              setIsGeneratingPlan(false);
           }, 500);
         }
         
-        // Store bot message in Supabase if authenticated
+        // Store bot message in database if authenticated, otherwise store locally
         if (isAuthenticated && currentConversationId) {
           const currentUser = authService.getCurrentUser();
           if (currentUser) {
             try {
+              console.log('Chatbot: Storing bot message to database for authenticated user');
               await chatService.storeMessage({
                 user_email: currentUser.email,
                 message_text: response.message,
@@ -326,9 +407,18 @@ export default function Chatbot({ openChat = false, conversationId }: ChatbotPro
                 conversation_id: currentConversationId
               });
             } catch (error) {
-              console.error('Error storing bot message:', error);
+              console.error('Error storing bot message to database:', error);
+              // Fallback to localStorage if database fails
+              saveMessageToLocalStorage(botMessage);
             }
           }
+        } else {
+          // Store to localStorage for unauthenticated users
+          console.log('Chatbot: Storing bot message to localStorage for unauthenticated user');
+          saveMessageToLocalStorage(botMessage);
+          
+          // Update pending conversation
+          savePendingConversation();
         }
       } else {
         const errorMessage: Message = {
@@ -339,11 +429,12 @@ export default function Chatbot({ openChat = false, conversationId }: ChatbotPro
         };
         setMessages(prev => [...prev, errorMessage]);
         
-        // Store error message in Supabase if authenticated
+        // Store error message in database if authenticated, otherwise store locally
         if (isAuthenticated && currentConversationId) {
           const currentUser = authService.getCurrentUser();
           if (currentUser) {
             try {
+              console.log('Chatbot: Storing error message to database for authenticated user');
               await chatService.storeMessage({
                 user_email: currentUser.email,
                 message_text: response.message,
@@ -352,9 +443,18 @@ export default function Chatbot({ openChat = false, conversationId }: ChatbotPro
                 conversation_id: currentConversationId
               });
             } catch (error) {
-              console.error('Error storing error message:', error);
+              console.error('Error storing error message to database:', error);
+              // Fallback to localStorage if database fails
+              saveMessageToLocalStorage(errorMessage);
             }
           }
+        } else {
+          // Store to localStorage for unauthenticated users
+          console.log('Chatbot: Storing error message to localStorage for unauthenticated user');
+          saveMessageToLocalStorage(errorMessage);
+          
+          // Update pending conversation
+          savePendingConversation();
         }
       }
     } catch (error) {
@@ -366,11 +466,12 @@ export default function Chatbot({ openChat = false, conversationId }: ChatbotPro
       };
       setMessages(prev => [...prev, errorMessage]);
       
-      // Store error message in Supabase if authenticated
+      // Store error message in database if authenticated, otherwise store locally
       if (isAuthenticated && currentConversationId) {
         const currentUser = authService.getCurrentUser();
         if (currentUser) {
           try {
+            console.log('Chatbot: Storing catch error message to database for authenticated user');
             await chatService.storeMessage({
               user_email: currentUser.email,
               message_text: errorMessage.text,
@@ -379,9 +480,18 @@ export default function Chatbot({ openChat = false, conversationId }: ChatbotPro
               conversation_id: currentConversationId
             });
           } catch (error) {
-            console.error('Error storing error message:', error);
+            console.error('Error storing catch error message to database:', error);
+            // Fallback to localStorage if database fails
+            saveMessageToLocalStorage(errorMessage);
           }
         }
+      } else {
+        // Store to localStorage for unauthenticated users
+        console.log('Chatbot: Storing catch error message to localStorage for unauthenticated user');
+        saveMessageToLocalStorage(errorMessage);
+        
+        // Update pending conversation
+        savePendingConversation();
       }
     } finally {
       setIsTyping(false);
@@ -441,38 +551,73 @@ export default function Chatbot({ openChat = false, conversationId }: ChatbotPro
 
   const handleLogin = () => {
     setShowAuthOptions(false);
+    console.log('handleLogin: Navigating to login page');
+    
     // Store conversation temporarily before navigating
     if (messages.length > 1) {
-      localStorage.setItem('pendingConversation', JSON.stringify({
+      const pendingConversation = {
         messages: messages,
         conversationId: currentConversationId,
         timestamp: new Date().toISOString()
-      }));
+      };
+      localStorage.setItem('pendingConversation', JSON.stringify(pendingConversation));
+      console.log('handleLogin: Stored pending conversation with', messages.length, 'messages');
+    } else {
+      console.log('handleLogin: No conversation to store (messages.length:', messages.length, ')');
     }
+    
     navigate('/login', { state: { returnToChat: true } });
   };
 
   const handleSignup = () => {
     setShowAuthOptions(false);
+    console.log('handleSignup: Navigating to signup page');
+    
     // Store conversation temporarily before navigating
     if (messages.length > 1) {
-      localStorage.setItem('pendingConversation', JSON.stringify({
+      const pendingConversation = {
         messages: messages,
         conversationId: currentConversationId,
         timestamp: new Date().toISOString()
-      }));
+      };
+      localStorage.setItem('pendingConversation', JSON.stringify(pendingConversation));
+      console.log('handleSignup: Stored pending conversation with', messages.length, 'messages');
+    } else {
+      console.log('handleSignup: No conversation to store (messages.length:', messages.length, ')');
     }
+    
     navigate('/signup', { state: { returnToChat: true } });
   };
 
   const handleSaveToAccount = async () => {
-    console.log('handleSaveToAccount called, isAuthenticated:', isAuthenticated);
+    console.log('🚀 SAVE & LOGIN BUTTON CLICKED! handleSaveToAccount called');
+    console.log('📊 Current state - isAuthenticated:', isAuthenticated);
+    console.log('📊 Current state - messages.length:', messages.length);
+    console.log('📊 Current state - currentConversationId:', currentConversationId);
+    console.log('📊 Current state - showAuthOptions:', showAuthOptions);
+    
+    // Add visual feedback in console
+    console.log('%c=== SAVE & LOGIN BUTTON PROCESSING ===', 'color: blue; font-weight: bold; font-size: 14px;');
     
     if (isAuthenticated) {
       try {
+        // Check if there are messages to save
+        if (messages.length <= 1) {
+          alert('No conversation to save yet. Start chatting to create a conversation!');
+          return;
+        }
+
         // Save conversation to both localStorage and Supabase
         const currentUser = authService.getCurrentUser();
-        if (currentUser && messages.length > 1) {
+        console.log('handleSaveToAccount: Current user:', currentUser);
+        
+        if (currentUser) {
+          console.log('handleSaveToAccount: Saving conversation with', messages.length, 'messages');
+          
+          // Ensure we have a conversation ID
+          const conversationId = currentConversationId || chatService.generateConversationId();
+          setCurrentConversationId(conversationId);
+          
           // Save to Supabase first
           for (const message of messages) {
             await chatService.storeMessage({
@@ -480,27 +625,31 @@ export default function Chatbot({ openChat = false, conversationId }: ChatbotPro
               message_text: message.text,
               sender: message.sender,
               timestamp: message.timestamp,
-              conversation_id: currentConversationId
+              conversation_id: conversationId
             });
           }
           
           // Also save to localStorage as backup
           saveConversationToLocalStorage();
           
-          alert('Conversation saved to your account successfully! You can access it from your dashboard.');
+          alert('✅ Conversation saved to your account successfully! You can access it from your dashboard.');
         } else {
-          alert('No messages to save or user not found.');
+          console.error('handleSaveToAccount: No current user found');
+          alert('❌ Unable to save: User session not found. Please try logging in again.');
         }
       } catch (error) {
         console.error('Error saving to account:', error);
         // Fallback to localStorage only
         saveConversationToLocalStorage();
-        alert('Saved to local storage. There was an issue saving to your account.');
+        alert('⚠️ Saved to local storage. There was an issue saving to your account. Please check your internet connection and try again.');
       }
     } else {
       // Show authentication options
-      console.log('User not authenticated, showing auth options');
+      console.log('🔐 User not authenticated, showing auth options');
+      console.log('📱 About to call setShowAuthOptions(true)');
       setShowAuthOptions(true);
+      console.log('✅ setShowAuthOptions(true) called successfully');
+      console.log('📊 showAuthOptions should now be true, current value:', showAuthOptions);
     }
   };
 
@@ -521,7 +670,18 @@ export default function Chatbot({ openChat = false, conversationId }: ChatbotPro
   const handleSavePendingConversation = async () => {
     try {
       const currentUser = authService.getCurrentUser();
-      if (!currentUser) return;
+      if (!currentUser) {
+        console.error('handleSavePendingConversation: No current user found');
+        return;
+      }
+
+      console.log('handleSavePendingConversation: Saving pending conversation for user:', currentUser.email);
+      console.log('handleSavePendingConversation: Messages to save:', messages.length);
+      console.log('handleSavePendingConversation: Conversation ID:', currentConversationId);
+
+      // Ensure we have a conversation ID
+      const conversationId = currentConversationId || chatService.generateConversationId();
+      setCurrentConversationId(conversationId);
 
       // Save conversation to Supabase
       for (const message of messages) {
@@ -530,7 +690,7 @@ export default function Chatbot({ openChat = false, conversationId }: ChatbotPro
           message_text: message.text,
           sender: message.sender,
           timestamp: message.timestamp,
-          conversation_id: currentConversationId
+          conversation_id: conversationId
         });
       }
 
@@ -539,12 +699,15 @@ export default function Chatbot({ openChat = false, conversationId }: ChatbotPro
 
       // Clear the pending conversation
       localStorage.removeItem('pendingConversation');
+      console.log('handleSavePendingConversation: Pending conversation cleared from localStorage');
 
       // Show success message
-      alert('Conversation saved to your account successfully! You can access it from your dashboard.');
+      alert('🎉 Welcome back! Your conversation has been saved to your account successfully!');
     } catch (error) {
       console.error('Error saving pending conversation:', error);
-      alert('There was an issue saving your conversation. It has been saved locally as backup.');
+      // Save to localStorage as fallback
+      saveConversationToLocalStorage();
+      alert('⚠️ Welcome back! Your conversation has been saved locally. There was an issue saving to your account.');
     }
   };
 
@@ -582,6 +745,48 @@ export default function Chatbot({ openChat = false, conversationId }: ChatbotPro
     return messages.map(msg => 
       `${msg.sender === 'user' ? 'You' : 'InvestRight Advisor'}: ${msg.text}`
     ).join('\n\n');
+  };
+
+  // Enhanced function to auto-sync all localStorage conversations when user authenticates
+  const syncLocalStorageToDatabase = async () => {
+    if (!isAuthenticated) return;
+
+    const currentUser = authService.getCurrentUser();
+    if (!currentUser) return;
+
+    try {
+      console.log('Chatbot: Starting localStorage to database sync for authenticated user');
+
+      // Sync current chat messages if they exist
+      const currentMessages = JSON.parse(localStorage.getItem('currentChatMessages') || '[]');
+      if (currentMessages.length > 0) {
+        console.log('Chatbot: Syncing', currentMessages.length, 'current messages to database');
+        
+        const conversationId = currentConversationId || chatService.generateConversationId();
+        setCurrentConversationId(conversationId);
+
+        for (const message of currentMessages) {
+          try {
+            await chatService.storeMessage({
+              user_email: currentUser.email,
+              message_text: message.text,
+              sender: message.sender,
+              timestamp: new Date(message.timestamp),
+              conversation_id: conversationId
+            });
+          } catch (error) {
+            console.error('Error syncing individual message to database:', error);
+          }
+        }
+
+        // Clear localStorage after successful sync
+        localStorage.removeItem('currentChatMessages');
+        console.log('Chatbot: Successfully synced and cleared current messages from localStorage');
+      }
+
+    } catch (error) {
+      console.error('Error syncing localStorage to database:', error);
+    }
   };
 
   if (!isOpen) {
@@ -654,21 +859,31 @@ export default function Chatbot({ openChat = false, conversationId }: ChatbotPro
 
       {/* Authentication Options Popup */}
       {showAuthOptions && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4"
+             style={{ 
+               border: '3px solid red', // Debug: make popup very visible
+               animation: 'pulse 1s infinite' // Debug: make it pulse
+             }}>
           <div className="bg-white rounded-2xl p-8 max-w-md w-full shadow-2xl">
             <h3 className="text-xl font-bold text-gray-900 mb-4">Save Your Conversation</h3>
             <p className="text-gray-600 mb-6">To save this conversation and access it later, please create an account or log in.</p>
             
             <div className="space-y-3">
               <button
-                onClick={handleSignup}
+                onClick={(e) => {
+                  console.log('🆕 CREATE ACCOUNT BUTTON CLICKED!', e);
+                  handleSignup();
+                }}
                 className="w-full px-4 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors flex items-center justify-center space-x-2"
               >
                 <UserPlus className="h-5 w-5" />
                 <span>Create Account</span>
               </button>
               <button
-                onClick={handleLogin}
+                onClick={(e) => {
+                  console.log('🔐 LOG IN BUTTON CLICKED!', e);
+                  handleLogin();
+                }}
                 className="w-full px-4 py-3 border-2 border-blue-600 text-blue-600 rounded-xl hover:bg-blue-50 transition-colors flex items-center justify-center space-x-2"
               >
                 <LogIn className="h-5 w-5" />
@@ -757,8 +972,15 @@ export default function Chatbot({ openChat = false, conversationId }: ChatbotPro
                   <div className="space-y-2 mt-3">
                     <div className="flex space-x-2">
                       <button
-                        onClick={handleSaveToAccount}
+                        onClick={(e) => {
+                          console.log('🖱️ BUTTON CLICK EVENT TRIGGERED!', e);
+                          console.log('🔍 Event target:', e.target);
+                          console.log('🔍 Button text:', e.target.textContent);
+                          console.log('🔍 handleSaveToAccount function exists:', typeof handleSaveToAccount);
+                          handleSaveToAccount();
+                        }}
                         className="flex-1 bg-blue-600 text-white px-3 py-2 rounded-lg hover:bg-blue-700 transition-all duration-200 text-xs font-medium shadow-lg hover:shadow-xl"
+                        style={{ pointerEvents: 'auto', cursor: 'pointer' }}
                       >
                         {isAuthenticated ? 'Save to Account' : 'Login & Save'}
                       </button>

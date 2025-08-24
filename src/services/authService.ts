@@ -298,6 +298,97 @@ class AuthService {
     }
   }
 
+  // Get all users (admin only)
+  async getAllUsers(): Promise<User[]> {
+    try {
+      // First try to get from Supabase
+      if (supabase) {
+        const { data, error } = await supabase
+          .from('users')
+          .select('*')
+          .order('created_at', { ascending: false });
+
+        if (error) {
+          console.error('Error fetching users from Supabase:', error);
+          throw error;
+        }
+
+        if (data) {
+          return data.map(user => ({
+            id: user.id,
+            username: user.username,
+            email: user.email,
+            role: user.role as 'admin' | 'user' | 'moderator',
+            is_active: user.is_active,
+            created_at: user.created_at,
+            last_login: user.last_login
+          }));
+        }
+      }
+
+      // Fallback to localStorage
+      const users = localStorage.getItem('users');
+      if (users) {
+        const parsedUsers = JSON.parse(users);
+        if (Array.isArray(parsedUsers)) {
+          return parsedUsers.sort((a, b) => 
+            new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+          );
+        }
+      }
+
+      // Return empty array if no users found
+      return [];
+    } catch (error) {
+      console.error('Error getting all users:', error);
+      return [];
+    }
+  }
+
+  // Reset user password (admin only)
+  async resetUserPassword(userId: number, newPassword: string): Promise<{ success: boolean; message: string }> {
+    try {
+      // First try to update in Supabase
+      if (supabase) {
+        const { error } = await supabase
+          .from('users')
+          .update({ 
+            password_hash: newPassword, // In production, this should be hashed
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', userId);
+
+        if (error) {
+          console.error('Error updating password in Supabase:', error);
+          throw error;
+        }
+      }
+
+      // Also update in localStorage as backup
+      const users = localStorage.getItem('users');
+      if (users) {
+        const parsedUsers = JSON.parse(users);
+        const userIndex = parsedUsers.findIndex((u: any) => u.id === userId);
+        if (userIndex !== -1) {
+          parsedUsers[userIndex].password_hash = newPassword;
+          parsedUsers[userIndex].updated_at = new Date().toISOString();
+          localStorage.setItem('users', JSON.stringify(parsedUsers));
+        }
+      }
+
+      return {
+        success: true,
+        message: 'Password reset successfully'
+      };
+    } catch (error) {
+      console.error('Error resetting password:', error);
+      return {
+        success: false,
+        message: 'Failed to reset password: ' + (error as Error).message
+      };
+    }
+  }
+
   // Validate session token
   async validateSession(token: string): Promise<boolean> {
     try {

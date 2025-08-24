@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Users, Award, Target, Heart, Wrench } from 'lucide-react';
 import { useLanguage } from '../hooks/useLanguage';
+import { chatService } from '../services/chatService';
 
 export default function About() {
   const { t } = useLanguage();
@@ -49,12 +50,51 @@ export default function About() {
     return totalCount;
   };
 
+  // Enhanced function to extract amounts from message text
+  const extractAmountsFromText = (text: string): number => {
+    // Use a Set to store unique amount matches to avoid double counting
+    const uniqueAmounts = new Set<string>();
+    
+    // Comprehensive regex pattern to catch all amount formats
+    const pattern = /(?:₹|Rs\.?|need|goal|want|require|target|save|buy|purchase|invest|investing|investment|cost|costs|price|worth|value)?\s*(\d+(?:\.\d+)?)\s*(lakh|lakhs|crore|crores|cr|lac|lacs)\b/gi;
+    
+    let match;
+    while ((match = pattern.exec(text)) !== null) {
+      const number = match[1];
+      const unit = match[2].toLowerCase();
+      
+      // Create a unique key for this amount to avoid duplicates
+      const amountKey = `${number}_${unit}`;
+      uniqueAmounts.add(amountKey);
+    }
+    
+    // Calculate total from unique amounts
+    let totalAmount = 0;
+    uniqueAmounts.forEach(amountKey => {
+      const [number, unit] = amountKey.split('_');
+      const numValue = parseFloat(number);
+      
+      if (!isNaN(numValue)) {
+        if (unit.includes('lakh') || unit.includes('lac')) {
+          totalAmount += numValue * 0.01; // Convert lakhs to crores
+        } else if (unit.includes('crore') || unit.includes('cr')) {
+          totalAmount += numValue;
+        }
+      }
+    });
+    
+    return totalAmount;
+  };
+
   // Function to calculate total life goal amounts from chat conversations
-  const calculateTotalLifeGoalAmounts = () => {
+  const calculateTotalLifeGoalAmounts = async () => {
     let totalAmount = 0;
     
     try {
-      // Extract amounts from all chat conversations
+      console.log('🔢 Starting goal amount calculation...');
+      
+      // Extract amounts from localStorage conversations (existing functionality)
+      console.log('📱 Extracting from localStorage conversations...');
       for (let i = 0; i < localStorage.length; i++) {
         const key = localStorage.key(i);
         if (key && key.startsWith('chat_conversations_')) {
@@ -65,33 +105,15 @@ export default function About() {
               parsedConversations.forEach(conversation => {
                 if (conversation.messages && Array.isArray(conversation.messages)) {
                   conversation.messages.forEach((message: any) => {
-                    if (message.role === 'user') {
-                      // Look for amounts in user messages (e.g., "I need 50 lakhs", "goal is 2 crore")
-                      const amountMatches = message.content.match(/(\d+(?:\.\d+)?)\s*(lakh|lakhs|crore|crores|cr|cr\+|lakh\+|lakhs\+)/gi);
-                      if (amountMatches) {
-                        amountMatches.forEach((match: string) => {
-                          const [number, unit] = match.toLowerCase().split(/\s+/);
-                          const numValue = parseFloat(number);
-                          if (!isNaN(numValue)) {
-                            if (unit.includes('lakh')) {
-                              totalAmount += numValue * 0.01; // Convert lakhs to crores
-                            } else if (unit.includes('crore') || unit.includes('cr')) {
-                              totalAmount += numValue;
-                            }
-                          }
-                        });
-                      }
-                      
-                      // Also look for amounts in numbers followed by "CR" or "crore"
-                      const crMatches = message.content.match(/(\d+(?:\.\d+)?)\s*(?:CR|cr|crore|crores)/gi);
-                      if (crMatches) {
-                        crMatches.forEach((match: string) => {
-                          const number = match.toLowerCase().replace(/\s*(?:cr|crore|crores)/i, '');
-                          const numValue = parseFloat(number);
-                          if (!isNaN(numValue)) {
-                            totalAmount += numValue;
-                          }
-                        });
+                    // Only extract from user messages, not bot messages
+                    if (message.sender === 'user' || message.role === 'user') {
+                      const messageText = message.text || message.content || '';
+                      if (messageText && messageText.trim()) {
+                        const amount = extractAmountsFromText(messageText);
+                        if (amount > 0) {
+                          console.log(`💰 Found amount: ₹${amount} CR from: "${messageText.substring(0, 50)}..."`);
+                          totalAmount += amount;
+                        }
                       }
                     }
                   });
@@ -102,78 +124,100 @@ export default function About() {
         }
       }
       
-      // Also check from the general users array if it exists
-      const users = localStorage.getItem('users');
-      if (users) {
-        const parsedUsers = JSON.parse(users);
-        if (Array.isArray(parsedUsers)) {
-          parsedUsers.forEach(user => {
-            const userChats = localStorage.getItem(`chat_conversations_${user.id}`);
-            if (userChats) {
-              const parsedUserChats = JSON.parse(userChats);
-              if (Array.isArray(parsedUserChats)) {
-                parsedUserChats.forEach(conversation => {
-                  if (conversation.messages && Array.isArray(conversation.messages)) {
-                    conversation.messages.forEach((message: any) => {
-                      if (message.role === 'user') {
-                        // Look for amounts in user messages
-                        const amountMatches = message.content.match(/(\d+(?:\.\d+)?)\s*(lakh|lakhs|crore|crores|cr|cr\+|lakh\+|lakhs\+)/gi);
-                        if (amountMatches) {
-                          amountMatches.forEach((match: string) => {
-                            const [number, unit] = match.toLowerCase().split(/\s+/);
-                            const numValue = parseFloat(number);
-                            if (!isNaN(numValue)) {
-                              if (unit.includes('lakh')) {
-                                totalAmount += numValue * 0.01; // Convert lakhs to crores
-                              } else if (unit.includes('crore') || unit.includes('cr')) {
-                                totalAmount += numValue;
-                              }
-                            }
-                          });
-                        }
-                        
-                        // Also look for amounts in numbers followed by "CR" or "crore"
-                        const crMatches = message.content.match(/(\d+(?:\.\d+)?)\s*(?:CR|cr|crore|crores)/gi);
-                        if (crMatches) {
-                          crMatches.forEach((match: string) => {
-                            const number = match.toLowerCase().replace(/\s*(?:cr|crore|crores)/i, '');
-                            const numValue = parseFloat(number);
-                            if (!isNaN(numValue)) {
-                              totalAmount += numValue;
-                            }
-                          });
-                        }
-                      }
-                    });
+      // Extract amounts from database conversations (Supabase)
+      console.log('🗄️ Extracting from database conversations...');
+      const databaseResult = await chatService.getAllConversations();
+      
+      if (databaseResult.success && databaseResult.conversations) {
+        console.log(`📊 Found ${databaseResult.conversations.length} database conversations`);
+        
+        databaseResult.conversations.forEach(conversation => {
+          if (conversation.messages && Array.isArray(conversation.messages)) {
+            conversation.messages.forEach((message: any) => {
+              // Only extract from user messages, not bot messages
+              if (message.sender === 'user') {
+                const messageText = message.message_text || '';
+                if (messageText && messageText.trim()) {
+                  const amount = extractAmountsFromText(messageText);
+                  if (amount > 0) {
+                    console.log(`💰 Found DB amount: ₹${amount} CR from: "${messageText.substring(0, 50)}..."`);
+                    totalAmount += amount;
                   }
-                });
+                }
               }
-            }
-          });
+            });
+          }
+        });
+      } else {
+        console.log('ℹ️ No database conversations found or error:', databaseResult.error);
+      }
+      
+      // Check pending conversations in localStorage
+      console.log('⏳ Checking pending conversations...');
+      const pendingConversation = localStorage.getItem('pendingConversation');
+      if (pendingConversation) {
+        try {
+          const parsed = JSON.parse(pendingConversation);
+          if (parsed.messages && Array.isArray(parsed.messages)) {
+            parsed.messages.forEach((message: any) => {
+              // Only extract from user messages, not bot messages
+              if (message.sender === 'user') {
+                const messageText = message.text || '';
+                if (messageText && messageText.trim()) {
+                  const amount = extractAmountsFromText(messageText);
+                  if (amount > 0) {
+                    console.log(`💰 Found pending amount: ₹${amount} CR from: "${messageText.substring(0, 50)}..."`);
+                    totalAmount += amount;
+                  }
+                }
+              }
+            });
+          }
+        } catch (e) {
+          console.error('Error parsing pending conversation:', e);
         }
       }
+      
+      const finalAmount = Math.round(totalAmount * 100) / 100; // Round to 2 decimal places
+      console.log(`✅ Total goal amount calculated: ₹${finalAmount} CR`);
+      
+      return finalAmount;
+      
     } catch (error) {
-      console.error('Error calculating life goal amounts:', error);
+      console.error('Error calculating total life goal amounts:', error);
+      return 0;
     }
-    
-    return Math.round(totalAmount * 100) / 100; // Round to 2 decimal places
   };
 
   useEffect(() => {
-    // Count conversations and calculate amounts on component mount
-    setTotalChats(countAllChatConversations());
-    setTotalLifeGoalAmount(calculateTotalLifeGoalAmounts());
-    
-    // Set up interval to update counts every 30 seconds
-    const interval = setInterval(() => {
+    // Function to load data asynchronously
+    const loadData = async () => {
+      console.log('🔄 Loading About component data...');
       setTotalChats(countAllChatConversations());
-      setTotalLifeGoalAmount(calculateTotalLifeGoalAmounts());
-    }, 30000);
+      
+      const goalAmount = await calculateTotalLifeGoalAmounts();
+      setTotalLifeGoalAmount(goalAmount);
+    };
+    
+    // Load data on component mount
+    loadData();
+    
+    // Set up interval to update counts every 60 seconds (increased to reduce API calls)
+    const interval = setInterval(async () => {
+      console.log('🔄 Refreshing About component data...');
+      setTotalChats(countAllChatConversations());
+      
+      const goalAmount = await calculateTotalLifeGoalAmounts();
+      setTotalLifeGoalAmount(goalAmount);
+    }, 60000);
     
     // Listen for storage changes to update counts in real-time
-    const handleStorageChange = () => {
+    const handleStorageChange = async () => {
+      console.log('📱 Storage change detected, updating data...');
       setTotalChats(countAllChatConversations());
-      setTotalLifeGoalAmount(calculateTotalLifeGoalAmounts());
+      
+      const goalAmount = await calculateTotalLifeGoalAmounts();
+      setTotalLifeGoalAmount(goalAmount);
     };
     
     window.addEventListener('storage', handleStorageChange);
