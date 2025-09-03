@@ -64,6 +64,52 @@ class ChatService {
     }
   }
 
+  // Store a complete conversation in Supabase
+  async storeConversation(conversation: Omit<ChatConversation, 'id'>): Promise<{ success: boolean; conversationId?: string; error?: string }> {
+    try {
+      if (!supabase) {
+        throw new Error('Supabase not configured');
+      }
+
+      // First, create a conversation record
+      const { data: convData, error: convError } = await supabase
+        .from('conversations')
+        .insert({
+          user_email: conversation.user_email,
+          title: conversation.title,
+          summary: conversation.summary,
+          message_count: conversation.message_count,
+          created_at: conversation.created_at.toISOString(),
+          last_message_at: conversation.last_message_at.toISOString()
+        })
+        .select('id')
+        .single();
+
+      if (convError) {
+        console.error('Error creating conversation:', convError);
+        return { success: false, error: convError.message };
+      }
+
+      const conversationId = convData.id;
+
+      // Then store all messages with the conversation ID
+      for (const message of conversation.messages) {
+        await this.storeMessage({
+          ...message,
+          conversation_id: conversationId
+        });
+      }
+
+      return { success: true, conversationId };
+    } catch (error) {
+      console.error('Error in storeConversation:', error);
+      return { 
+        success: false, 
+        error: error instanceof Error ? error.message : 'Unknown error' 
+      };
+    }
+  }
+
   // Get all conversations for a user
   async getUserConversations(userEmail: string): Promise<{ success: boolean; conversations?: ConversationSummary[]; error?: string }> {
     try {
@@ -71,7 +117,33 @@ class ChatService {
         throw new Error('Supabase not configured');
       }
 
-      // Get unique conversation IDs for the user
+      // First try to get conversations from the conversations table if it exists
+      try {
+        const { data: conversations, error: convError } = await supabase
+          .from('conversations')
+          .select('*')
+          .eq('user_email', userEmail)
+          .order('last_message_at', { ascending: false });
+
+        if (!convError && conversations && conversations.length > 0) {
+          console.log('Found conversations from conversations table:', conversations.length);
+          return { 
+            success: true, 
+            conversations: conversations.map(conv => ({
+              id: conv.id,
+              title: conv.title,
+              summary: conv.summary,
+              message_count: conv.message_count,
+              created_at: new Date(conv.created_at),
+              last_message_at: new Date(conv.last_message_at)
+            }))
+          };
+        }
+      } catch (tableError) {
+        console.log('Conversations table not available, falling back to message grouping');
+      }
+
+      // Fallback: Get unique conversation IDs for the user from chat_messages
       const { data: conversationIds, error: convError } = await supabase
         .from('chat_messages')
         .select('conversation_id')
@@ -84,11 +156,13 @@ class ChatService {
       }
 
       if (!conversationIds || conversationIds.length === 0) {
+        console.log('No conversations found for user:', userEmail);
         return { success: true, conversations: [] };
       }
 
       // Get unique conversation IDs
       const uniqueConversationIds = [...new Set(conversationIds.map(c => c.conversation_id))];
+      console.log('Found unique conversation IDs:', uniqueConversationIds);
 
       // Get conversation summaries
       const conversations: ConversationSummary[] = [];
@@ -136,6 +210,7 @@ class ChatService {
       // Sort by last message date (newest first)
       conversations.sort((a, b) => b.last_message_at.getTime() - a.last_message_at.getTime());
 
+      console.log('Generated conversations from messages:', conversations.length);
       return { success: true, conversations };
     } catch (error) {
       console.error('Error in getUserConversations:', error);
@@ -439,6 +514,89 @@ class ChatService {
         success: false, 
         error: error instanceof Error ? error.message : 'Unknown error' 
       };
+    }
+  }
+
+  // Migrate all locally stored chats to Supabase for the current authenticated user
+  async migrateLocalChatsToSupabase(userEmail: string): Promise<{ success: boolean; migrated: number; errors: number; details?: string[] }> {
+    const details: string[] = [];
+    try {
+      if (!supabase) {
+        return { success: false, migrated: 0, errors: 0, details: ['Supabase not configured'] };
+      }
+
+      // Gather messages from known localStorage keys
+      const migratedMessages: any[] = [];
+
+      // 1) Current chat messages
+      try {
+        const current = localStorage.getItem('currentChatMessages');
+        if (current) {
+          const msgs = JSON.parse(current);
+          if (Array.isArray(msgs)) {
+            migratedMessages.push({ type: 'current', messages: msgs });
+          }
+        }
+      } catch {
+        details.push('Failed to parse currentChatMessages');
+      }
+
+      // 2) Pending conversation (has messages + conversationId)
+      let pendingConversationId: string | null = null;
+      try {
+        const pending = localStorage.getItem('pendingConversation');
+        if (pending) {
+          const parsed = JSON.parse(pending);
+          if (parsed && Array.isArray(parsed.messages)) {
+            pendingConversationId = parsed.conversationId || null;
+            migratedMessages.push({ type: 'pending', messages: parsed.messages, conversationId: pendingConversationId });
+          }
+        }
+      } catch {
+        details.push('Failed to parse pendingConversation');
+      }
+
+      // Nothing to migrate
+      if (migratedMessages.length === 0) {
+        return { success: true, migrated: 0, errors: 0, details: ['No local chat data found'] };
+      }
+
+      let migrated = 0;
+      let errors = 0;
+
+      // For each message batch, write to chat_messages
+      for (const batch of migratedMessages) {
+        const conversationId = batch.conversationId || this.generateConversationId();
+        for (const m of batch.messages) {
+          try {
+            const sender = (m.sender === 'user' || m.sender === 'bot') ? m.sender : (m.sender === 'assistant' ? 'bot' : 'user');
+            const timestamp = new Date(m.timestamp || Date.now());
+            const messageText = m.text || m.message_text || '';
+            if (!messageText) continue;
+
+            const result = await this.storeMessage({
+              user_email: userEmail,
+              message_text: messageText,
+              sender,
+              timestamp,
+              conversation_id: conversationId
+            });
+
+            if (result.success) migrated++; else { errors++; details.push(result.error || 'Unknown store error'); }
+          } catch (e) {
+            errors++;
+            details.push((e as Error).message);
+          }
+        }
+      }
+
+      // Clear local copies after migration
+      localStorage.removeItem('currentChatMessages');
+      localStorage.removeItem('pendingConversation');
+
+      return { success: errors === 0, migrated, errors, details };
+    } catch (e) {
+      return { success: false, migrated: 0, errors: 1, details: [(e as Error).message] };
     }
   }
 }

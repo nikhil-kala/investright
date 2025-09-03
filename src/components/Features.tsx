@@ -1,5 +1,5 @@
 import React from 'react';
-import { Calculator, PieChart, BookOpen, BarChart3, Shield, Zap } from 'lucide-react';
+import { MessageCircle, Target, Scale, UserCheck, Trophy, TrendingUp } from 'lucide-react';
 import { useLanguage } from '../hooks/useLanguage';
 
 export default function Features() {
@@ -7,32 +7,32 @@ export default function Features() {
 
   const features = [
     {
-      icon: Calculator,
+      icon: MessageCircle,
       title: t.features.calculator.title,
       description: t.features.calculator.description
     },
     {
-      icon: PieChart,
+      icon: Target,
       title: t.features.portfolio.title,
       description: t.features.portfolio.description
     },
     {
-      icon: BookOpen,
+      icon: Scale,
       title: t.features.education.title,
       description: t.features.education.description
     },
     {
-      icon: BarChart3,
+      icon: UserCheck,
       title: t.features.research.title,
       description: t.features.research.description
     },
     {
-      icon: Shield,
+      icon: Trophy,
       title: t.features.risk.title,
       description: t.features.risk.description
     },
     {
-      icon: Zap,
+      icon: TrendingUp,
       title: t.features.execution.title,
       description: t.features.execution.description
     }
@@ -56,8 +56,22 @@ export default function Features() {
               key={index}
               className="bg-gray-50 p-8 rounded-xl hover:bg-white hover:shadow-lg transition-all duration-300 border border-gray-100"
             >
-              <div className="bg-blue-100 w-12 h-12 rounded-lg flex items-center justify-center mb-6">
-                <feature.icon className="h-6 w-6 text-blue-700" />
+              <div className={`w-12 h-12 rounded-lg flex items-center justify-center mb-6 ${
+                index === 0 ? 'bg-blue-100' : // Chat-based AI Advisor - Blue
+                index === 1 ? 'bg-green-100' : // Holistic Life Goal Planning - Green
+                index === 2 ? 'bg-purple-100' : // Unbiased Financial Advice - Purple
+                index === 3 ? 'bg-indigo-100' : // Personalized Strategies - Indigo
+                index === 4 ? 'bg-yellow-100' : // Dream Goal Tracker - Yellow
+                'bg-orange-100' // Smart Income Growth Tips - Orange
+              }`}>
+                <feature.icon className={`h-6 w-6 ${
+                  index === 0 ? 'text-blue-700' : // Chat-based AI Advisor
+                  index === 1 ? 'text-green-700' : // Holistic Life Goal Planning
+                  index === 2 ? 'text-purple-700' : // Unbiased Financial Advice
+                  index === 3 ? 'text-indigo-700' : // Personalized Strategies
+                  index === 4 ? 'text-yellow-700' : // Dream Goal Tracker
+                  'text-orange-700' // Smart Income Growth Tips
+                }`} />
               </div>
               <h3 className="text-xl font-semibold text-gray-900 mb-4">{feature.title}</h3>
               <p className="text-gray-600 leading-relaxed">{feature.description}</p>

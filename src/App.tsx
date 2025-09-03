@@ -7,6 +7,7 @@ import Features from './components/Features'
 import About from './components/About'
 import Footer from './components/Footer'
 import Chatbot from './components/Chatbot'
+import Chat from './components/Chat'
 import Login from './components/Login'
 import Contact from './components/Contact'
 import OurStory from './components/OurStory'
@@ -17,7 +18,6 @@ import Signup from './components/Signup'
 
 function HomePage() {
   console.log('HomePage component rendering...')
-  const location = useLocation();
   
   return (
     <div className="min-h-screen bg-white">
@@ -26,7 +26,6 @@ function HomePage() {
       <Features />
       <About />
       <Footer />
-      <Chatbot openChat={location.state?.openChat} conversationId={location.state?.conversationId} />
     </div>
   )
 }
@@ -75,12 +74,24 @@ function SignupPage() {
   )
 }
 
+function ChatPage() {
+  console.log('ChatPage component rendering...')
+  return (
+    <div className="min-h-screen bg-white">
+      <Header />
+      <Chat />
+      {/* Footer hidden for chat page */}
+    </div>
+  )
+}
+
 function App() {
   console.log('App component rendering...')
   return (
     <Router>
       <Routes>
         <Route path="/" element={<HomePage />} />
+        <Route path="/chat" element={<ChatPage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/contact" element={<ContactPage />} />
         <Route path="/our-story" element={<OurStoryPage />} />

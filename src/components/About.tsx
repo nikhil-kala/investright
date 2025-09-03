@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { Users, Award, Target, Heart, Wrench } from 'lucide-react';
+import { Users, Award, Target, Heart, Wrench, MessageCircle } from 'lucide-react';
 import { useLanguage } from '../hooks/useLanguage';
 import { chatService } from '../services/chatService';
+import { useNavigate } from 'react-router-dom';
 
 export default function About() {
   const { t } = useLanguage();
+  const navigate = useNavigate();
   const [totalChats, setTotalChats] = useState(0);
   const [totalLifeGoalAmount, setTotalLifeGoalAmount] = useState(0);
 
@@ -255,9 +257,18 @@ export default function About() {
               </div>
             </div>
 
-            <button className="bg-blue-600 text-white px-8 py-3 rounded-lg hover:bg-blue-700 transition-colors font-semibold">
-              {t.about.startJourney}
-            </button>
+            <div className="flex flex-col sm:flex-row gap-4">
+              <button className="bg-blue-600 text-white px-8 py-3 rounded-lg hover:bg-blue-700 transition-colors font-semibold">
+                {t.about.startJourney}
+              </button>
+              <button 
+                onClick={() => navigate('/chat')}
+                className="bg-green-600 text-white px-8 py-3 rounded-lg hover:bg-green-700 transition-colors font-semibold flex items-center gap-2"
+              >
+                <MessageCircle className="h-5 w-5" />
+                Start Chatting
+              </button>
+            </div>
           </div>
 
           <div className="grid grid-cols-2 gap-6">

@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Eye, EyeOff, Mail, Lock, User, Phone, Building, Globe, ArrowLeft } from 'lucide-react';
+import { Eye, EyeOff, Mail, Lock, User, Phone, Building, Globe } from 'lucide-react';
 import { useLanguage } from '../hooks/useLanguage';
 import { authService } from '../services/authService';
 
 export default function Signup() {
-  const { t } = useLanguage();
+  useLanguage();
   const navigate = useNavigate();
   const location = useLocation();
   
@@ -100,56 +100,27 @@ export default function Signup() {
     setIsLoading(true);
 
     try {
-      // In a real app, you would call your signup API here
-      // For now, we'll simulate the signup process
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      // Create username from first and last name
-      const username = `${formData.firstName.toLowerCase()}.${formData.lastName.toLowerCase()}`;
-      
-      // Simulate successful signup
-      setSuccess('Account created successfully with User role! Redirecting to login...');
-      
-      // Create a proper user account in localStorage that can be authenticated
-      const userAccount = {
-        id: Date.now(),
-        username: username,
+      const result = await authService.register({
         email: formData.email,
-        password: formData.password, // In real app, this would be hashed
+        password: formData.password,
         firstName: formData.firstName,
         lastName: formData.lastName,
-        role: 'user',
-        is_active: true,
-        created_at: new Date().toISOString(),
-        last_login: null
-      };
-      
-      // Store user account in localStorage
-      localStorage.setItem(`user_${formData.email}`, JSON.stringify(userAccount));
-      
-      // Also store in a users list for easy lookup
-      const existingUsers = JSON.parse(localStorage.getItem('users') || '[]');
-      existingUsers.push(userAccount);
-      localStorage.setItem('users', JSON.stringify(existingUsers));
-      
-      // Store signup data in localStorage for demo purposes
-      localStorage.setItem('signupData', JSON.stringify({
-        ...formData,
-        username,
-        role: 'user', // Assign user role
-        createdAt: new Date().toISOString()
-      }));
-      
-      // Redirect to login after a short delay
-      setTimeout(() => {
-        navigate('/login', { 
-          state: { 
-            from: from,
-            returnToChat: returnToChat, // Pass through the returnToChat state
-            message: 'Account created successfully with User role! Please log in with your new credentials.' 
-          } 
-        });
-      }, 2000);
+        role: 'user'
+      });
+
+      if (!result.success) {
+        setError(result.message || 'Registration failed. Please try again.');
+        return;
+      }
+
+      setSuccess('Account created successfully with User role! Redirecting to login...');
+      navigate('/login', { 
+        state: { 
+          from: from,
+          returnToChat: returnToChat,
+          message: 'Account created successfully with User role! Please log in with your new credentials.' 
+        } 
+      });
       
     } catch (err) {
       setError('An error occurred during signup. Please try again.');
@@ -158,9 +129,9 @@ export default function Signup() {
     }
   };
 
-  const handleBackToHome = () => {
-    navigate('/');
-  };
+  // const handleBackToHome = () => {
+  //   navigate('/');
+  // };
 
   return (
     <div className="py-20 bg-gray-50">

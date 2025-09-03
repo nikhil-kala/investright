@@ -1,12 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { User, LogOut, Settings, BarChart3, Users, Shield, Activity, Calendar, TrendingUp, MessageCircle, Clock, Bot, X } from 'lucide-react';
+import { User, LogOut, Settings, BarChart3, Users, Shield, Activity, Calendar, TrendingUp, MessageCircle, Clock, Bot, X, RefreshCcw } from 'lucide-react';
 import { useLanguage } from '../hooks/useLanguage';
 import { authService, User as UserType } from '../services/authService';
-import { chatService, ConversationSummary } from '../services/chatService';
+import { chatService } from '../services/chatService';
 
 export default function Dashboard() {
-  const { t } = useLanguage();
+  useLanguage();
   const navigate = useNavigate();
   const [currentUser, setCurrentUser] = useState<UserType | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -22,6 +22,146 @@ export default function Dashboard() {
   const [chatStats, setChatStats] = useState<any>({});
   const [selectedChat, setSelectedChat] = useState<any>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [isMigratingUsers, setIsMigratingUsers] = useState(false);
+  const [migrationResult, setMigrationResult] = useState<string | null>(null);
+  
+  // Enhanced chat conversation management
+  const [chatSearchTerm, setChatSearchTerm] = useState('');
+  const [chatSortBy, setChatSortBy] = useState<'date' | 'title' | 'messages'>('date');
+  const [chatSortOrder, setChatSortOrder] = useState<'asc' | 'desc'>('desc');
+  const [chatFilterDate, setChatFilterDate] = useState<'all' | 'today' | 'week' | 'month'>('all');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [conversationsPerPage] = useState(10);
+
+  // Helper function to format username for display
+  const formatDisplayName = (username: string) => {
+    const parts = username.split('.');
+    if (parts.length >= 2) {
+      const firstName = parts[0].charAt(0).toUpperCase() + parts[0].slice(1);
+      const lastName = parts[1].charAt(0).toUpperCase() + parts[1].slice(1);
+      return `${firstName} ${lastName}`;
+    }
+    // Fallback: capitalize first letter of the whole username
+    return username.charAt(0).toUpperCase() + username.slice(1);
+  };
+
+  // Helper function to get first name only
+  const getFirstName = (username: string) => {
+    const parts = username.split('.');
+    if (parts.length >= 1) {
+      return parts[0].charAt(0).toUpperCase() + parts[0].slice(1);
+    }
+    return username.charAt(0).toUpperCase() + username.slice(1);
+  };
+
+  // Helper function to format date for grouping
+  const getDateGroup = (date: string) => {
+    const now = new Date();
+    const messageDate = new Date(date);
+    const diffTime = now.getTime() - messageDate.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+    if (diffDays === 0) return 'Today';
+    if (diffDays === 1) return 'Yesterday';
+    if (diffDays <= 7) return 'This Week';
+    if (diffDays <= 30) return 'This Month';
+    return 'Older';
+  };
+
+  // Helper function to filter conversations by date
+  const filterConversationsByDate = (conversations: any[], filter: string) => {
+    if (filter === 'all') return conversations;
+    
+    const now = new Date();
+    const filterDate = new Date();
+    
+    switch (filter) {
+      case 'today':
+        filterDate.setHours(0, 0, 0, 0);
+        break;
+      case 'week':
+        filterDate.setDate(now.getDate() - 7);
+        break;
+      case 'month':
+        filterDate.setDate(now.getDate() - 30);
+        break;
+    }
+    
+    return conversations.filter(conv => new Date(conv.date) >= filterDate);
+  };
+
+  // Helper function to sort conversations
+  const sortConversations = (conversations: any[], sortBy: string, order: string) => {
+    return [...conversations].sort((a, b) => {
+      let aValue, bValue;
+      
+      switch (sortBy) {
+        case 'date':
+          aValue = new Date(a.date).getTime();
+          bValue = new Date(b.date).getTime();
+          break;
+        case 'title':
+          aValue = a.title.toLowerCase();
+          bValue = b.title.toLowerCase();
+          break;
+        case 'messages':
+          aValue = a.message_count || a.messages?.length || 0;
+          bValue = b.message_count || b.messages?.length || 0;
+          break;
+        default:
+          aValue = new Date(a.date).getTime();
+          bValue = new Date(b.date).getTime();
+      }
+      
+      if (order === 'asc') {
+        return aValue > bValue ? 1 : -1;
+      } else {
+        return aValue < bValue ? 1 : -1;
+      }
+    });
+  };
+
+  // Helper function to search conversations
+  const searchConversations = (conversations: any[], searchTerm: string) => {
+    if (!searchTerm.trim()) return conversations;
+    
+    const term = searchTerm.toLowerCase();
+    return conversations.filter(conv => 
+      conv.title.toLowerCase().includes(term) ||
+      conv.summary?.toLowerCase().includes(term) ||
+      conv.messages?.some((msg: any) => msg.text?.toLowerCase().includes(term))
+    );
+  };
+
+  // Get filtered and sorted conversations
+  const getProcessedConversations = () => {
+    let processed = [...chatConversations];
+    
+    // Apply search filter
+    processed = searchConversations(processed, chatSearchTerm);
+    
+    // Apply date filter
+    processed = filterConversationsByDate(processed, chatFilterDate);
+    
+    // Apply sorting
+    processed = sortConversations(processed, chatSortBy, chatSortOrder);
+    
+    return processed;
+  };
+
+  // Get paginated conversations
+  const getPaginatedConversations = () => {
+    const processed = getProcessedConversations();
+    const startIndex = (currentPage - 1) * conversationsPerPage;
+    const endIndex = startIndex + conversationsPerPage;
+    return processed.slice(startIndex, endIndex);
+  };
+
+  // Get total pages
+  const getTotalPages = () => {
+    const processed = getProcessedConversations();
+    return Math.ceil(processed.length / conversationsPerPage);
+  };
 
   useEffect(() => {
     // Check if user is authenticated
@@ -44,12 +184,60 @@ export default function Dashboard() {
     setIsLoading(false);
   }, [navigate]);
 
+  // Refresh conversations when user returns to dashboard
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (!document.hidden && currentUser) {
+        console.log('Dashboard: Page became visible, refreshing conversations...');
+        loadChatConversations(currentUser);
+      }
+    };
+
+    const handleFocus = () => {
+      if (currentUser) {
+        console.log('Dashboard: Window focused, refreshing conversations...');
+        loadChatConversations(currentUser);
+      }
+    };
+
+    // Listen for custom events when conversations are saved
+    const handleConversationSaved = () => {
+      if (currentUser) {
+        console.log('Dashboard: Conversation saved event detected, refreshing...');
+        setTimeout(() => {
+          loadChatConversations(currentUser);
+        }, 1000); // Small delay to ensure database is updated
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', handleFocus);
+    window.addEventListener('conversationSaved', handleConversationSaved);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleFocus);
+      window.removeEventListener('conversationSaved', handleConversationSaved);
+    };
+  }, [currentUser]);
+
   // Load user list when user report is shown
   useEffect(() => {
     if (showUserReport && currentUser?.role === 'admin') {
       refreshUserList();
     }
   }, [showUserReport, currentUser]);
+
+  // Load users immediately when admin user logs in
+  useEffect(() => {
+    if (currentUser?.role === 'admin') {
+      // Load users immediately and also after a small delay to ensure component is fully mounted
+      refreshUserList();
+      setTimeout(() => {
+        refreshUserList();
+      }, 500);
+    }
+  }, [currentUser]);
 
   // Load all chats when admin chat view is shown
   useEffect(() => {
@@ -59,26 +247,38 @@ export default function Dashboard() {
     }
   }, [showAllChats, currentUser]);
 
+  // Reset pagination when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [chatSearchTerm, chatSortBy, chatSortOrder, chatFilterDate]);
+
   const loadChatConversations = async (user: UserType) => {
     setIsLoadingChats(true);
     try {
+      console.log('Dashboard: Loading conversations for user:', user.email);
+      
       // Try to load conversations from Supabase first
       const result = await chatService.getUserConversations(user.email);
       
       if (result.success && result.conversations) {
+        console.log('Dashboard: Found', result.conversations.length, 'conversations from database');
+        
         // Convert ConversationSummary to the format expected by the component
         const convertedConversations = result.conversations.map(conv => ({
           id: conv.id,
           title: conv.title,
           date: conv.last_message_at.toISOString(),
           messages: [], // We don't need full messages for the list view
-          summary: conv.summary
+          summary: conv.summary,
+          message_count: conv.message_count
         }));
         
         setChatConversations(convertedConversations);
         
         // Also store locally as backup
         localStorage.setItem(`chat_conversations_${user.id}`, JSON.stringify(convertedConversations));
+        
+        console.log('Dashboard: Successfully loaded conversations:', convertedConversations.length);
       } else {
         // Fallback to localStorage if Supabase fails
         const storedChats = localStorage.getItem(`chat_conversations_${user.id}`);
@@ -124,41 +324,90 @@ export default function Dashboard() {
     }
   };
 
+  // Add refresh button for conversations
+  const refreshConversations = async () => {
+    if (currentUser) {
+      console.log('Dashboard: Manual refresh triggered');
+      await loadChatConversations(currentUser);
+    }
+  };
+
   const countTotalUsers = () => {
     let count = 0;
     try {
-      // Count users from localStorage
+      // First try to get from the allUsers state if available
+      if (allUsers && allUsers.length > 0) {
+        count = allUsers.length;
+        return count;
+      }
+      
+      // Try to get from localStorage users
+      const users = localStorage.getItem('users');
+      if (users) {
+        try {
+          const parsedUsers = JSON.parse(users);
+          if (Array.isArray(parsedUsers)) {
+            count = parsedUsers.length;
+            return count;
+          }
+        } catch (parseError) {
+          console.error('Dashboard: Error parsing localStorage users:', parseError);
+        }
+      }
+      
+      // Try to get from dashboard_users
+      const dashboardUsers = localStorage.getItem('dashboard_users');
+      if (dashboardUsers) {
+        try {
+          const parsedUsers = JSON.parse(dashboardUsers);
+          if (Array.isArray(parsedUsers)) {
+            count = parsedUsers.length;
+            return count;
+          }
+        } catch (parseError) {
+          console.error('Dashboard: Error parsing dashboard_users:', parseError);
+        }
+      }
+      
+      // Count users from localStorage keys (fallback method)
       for (let i = 0; i < localStorage.length; i++) {
         const key = localStorage.key(i);
         if (key && key.startsWith('user_')) {
           count++;
         }
       }
-      
-      // Also count from the general users array if it exists
-      const users = localStorage.getItem('users');
-      if (users) {
-        const parsedUsers = JSON.parse(users);
-        if (Array.isArray(parsedUsers)) {
-          count = Math.max(count, parsedUsers.length);
-        }
-      }
     } catch (error) {
-      console.error('Error counting users:', error);
+      console.error('Dashboard: Error counting users:', error);
     }
     return count;
   };
 
   const refreshUserList = async () => {
-    if (!currentUser || currentUser.role !== 'admin') return;
+    if (!currentUser || currentUser.role !== 'admin') {
+      return;
+    }
     
     setIsLoadingUsers(true);
     try {
       const users = await authService.getAllUsers();
       setAllUsers(users);
       setTotalUsers(users.length);
+      
+      // Store in localStorage for persistence
+      localStorage.setItem('dashboard_users', JSON.stringify(users));
     } catch (error) {
-      console.error('Error refreshing user list:', error);
+      console.error('Dashboard: Error refreshing user list:', error);
+      // Try to get users from localStorage as fallback
+      const storedUsers = localStorage.getItem('dashboard_users');
+      if (storedUsers) {
+        try {
+          const parsedUsers = JSON.parse(storedUsers);
+          setAllUsers(parsedUsers);
+          setTotalUsers(parsedUsers.length);
+        } catch (parseError) {
+          console.error('Dashboard: Error parsing stored users:', parseError);
+        }
+      }
     } finally {
       setIsLoadingUsers(false);
     }
@@ -213,6 +462,23 @@ export default function Dashboard() {
 
   const handleCloseChatDetails = () => {
     setSelectedChat(null);
+  };
+
+  const handleMigrateUsers = async () => {
+    if (!currentUser || currentUser.role !== 'admin') return;
+    setIsMigratingUsers(true);
+    setMigrationResult(null);
+    try {
+      const result = await authService.migrateLocalUsersToSupabase();
+      const summary = `Migrated: ${result.migrated}, Errors: ${result.errors}${result.details && result.details.length ? `\n${result.details.slice(0,5).join('\n')}${result.details.length>5 ? '\n...' : ''}` : ''}`;
+      setMigrationResult(summary);
+      // Refresh lists after migration
+      await refreshUserList();
+    } catch (e) {
+      setMigrationResult('Migration failed.');
+    } finally {
+      setIsMigratingUsers(false);
+    }
   };
 
   const filteredChats = allChats.filter(chat => 
@@ -310,7 +576,7 @@ export default function Dashboard() {
                   <User className="h-4 w-4 text-blue-600" />
                 </div>
                 <span className="text-sm font-medium text-gray-700">
-                  {currentUser.username.split('.')[0] || currentUser.username} {currentUser.username.split('.')[1] || ''}
+                  {formatDisplayName(currentUser.username)}
                 </span>
               </div>
               <button
@@ -332,7 +598,7 @@ export default function Dashboard() {
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-2xl font-bold mb-2">
-                Welcome back, {currentUser.username.split('.')[0] || currentUser.username}! 👋
+                Welcome back, {getFirstName(currentUser.username)}! 👋
               </h2>
               <p className="text-blue-100">
                 Here's what's happening with your InvestRight account
@@ -436,20 +702,112 @@ export default function Dashboard() {
           )}
         </div>
 
-        {/* Chat Conversations */}
+        {/* Enhanced Chat Conversations */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-8">
           <div className="flex items-center justify-between mb-6">
             <h3 className="text-lg font-semibold text-gray-900 flex items-center">
               <MessageCircle className="h-5 w-5 text-blue-600 mr-2" />
-              Recent Chat Conversations
+              Chat Conversations
+              {chatConversations.length > 10 && (
+                <span className="ml-2 text-sm font-normal text-gray-500">
+                  (Latest 10 per page)
+                </span>
+              )}
             </h3>
-            <button 
-              onClick={() => navigate('/')}
-              className="text-sm text-blue-600 hover:text-blue-700 font-medium"
-            >
-              Start New Chat →
-            </button>
+            <div className="flex items-center space-x-3">
+              <button
+                onClick={refreshConversations}
+                disabled={isLoadingChats}
+                className="flex items-center space-x-2 px-3 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg transition-colors disabled:opacity-50"
+                title="Refresh conversations"
+              >
+                <svg className={`h-4 w-4 ${isLoadingChats ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                <span className="text-sm">Refresh</span>
+              </button>
+              <button 
+                onClick={() => navigate('/chat')}
+                className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
+              >
+                Start New Chat
+              </button>
+            </div>
           </div>
+
+          {/* Search and Filter Controls */}
+          {chatConversations.length > 0 && (
+            <div className="mb-6 space-y-4">
+              {/* Search Bar */}
+              <div className="relative">
+                <input
+                  type="text"
+                  placeholder="Search conversations by title or content..."
+                  value={chatSearchTerm}
+                  onChange={(e) => setChatSearchTerm(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+                <svg className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+              </div>
+
+              {/* Filter and Sort Controls */}
+              <div className="flex flex-wrap items-center gap-4">
+                {/* Date Filter */}
+                <div className="flex items-center space-x-2">
+                  <label className="text-sm font-medium text-gray-700">Filter:</label>
+                  <select
+                    value={chatFilterDate}
+                    onChange={(e) => setChatFilterDate(e.target.value as any)}
+                    className="px-3 py-1 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="all">All Time</option>
+                    <option value="today">Today</option>
+                    <option value="week">This Week</option>
+                    <option value="month">This Month</option>
+                  </select>
+                </div>
+
+                {/* Sort By */}
+                <div className="flex items-center space-x-2">
+                  <label className="text-sm font-medium text-gray-700">Sort by:</label>
+                  <select
+                    value={chatSortBy}
+                    onChange={(e) => setChatSortBy(e.target.value as any)}
+                    className="px-3 py-1 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="date">Date</option>
+                    <option value="title">Title</option>
+                    <option value="messages">Message Count</option>
+                  </select>
+                </div>
+
+                {/* Sort Order */}
+                <div className="flex items-center space-x-2">
+                  <label className="text-sm font-medium text-gray-700">Order:</label>
+                  <select
+                    value={chatSortOrder}
+                    onChange={(e) => setChatSortOrder(e.target.value as any)}
+                    className="px-3 py-1 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="desc">Newest First</option>
+                    <option value="asc">Oldest First</option>
+                  </select>
+                </div>
+
+                {/* Results Count */}
+                <div className="text-sm text-gray-600">
+                  {getProcessedConversations().length} of {chatConversations.length} conversations
+                  {getTotalPages() > 1 && (
+                    <span className="ml-2 text-blue-600">
+                      (Page {currentPage} of {getTotalPages()})
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
 
           {isLoadingChats ? (
             <div className="text-center py-8">
@@ -462,53 +820,148 @@ export default function Dashboard() {
               <h4 className="text-lg font-medium text-gray-900 mb-2">No conversations yet</h4>
               <p className="text-gray-600 mb-4">Start chatting with our AI assistant to see your conversation history here.</p>
               <button 
-                onClick={() => navigate('/')}
+                onClick={() => navigate('/chat')}
                 className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
               >
                 Start Your First Chat
               </button>
             </div>
+          ) : getProcessedConversations().length === 0 ? (
+            <div className="text-center py-8">
+              <MessageCircle className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+              <h4 className="text-lg font-medium text-gray-900 mb-2">No conversations found</h4>
+              <p className="text-gray-600 mb-4">Try adjusting your search or filter criteria.</p>
+              <button 
+                onClick={() => {
+                  setChatSearchTerm('');
+                  setChatFilterDate('all');
+                }}
+                className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                Clear Filters
+              </button>
+            </div>
           ) : (
-            <div className="space-y-4">
-              {chatConversations.map((conversation) => (
-                <div 
-                  key={conversation.id}
-                  className="border border-gray-200 rounded-lg p-4 hover:border-blue-300 hover:bg-blue-50 transition-colors cursor-pointer"
-                  onClick={() => navigate('/', { state: { openChat: true, conversationId: conversation.id } })}
-                >
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center space-x-3 mb-2">
-                        <div className="bg-blue-100 p-2 rounded-full">
-                          <MessageCircle className="h-4 w-4 text-blue-600" />
-                        </div>
-                        <h4 className="font-medium text-gray-900">{conversation.title}</h4>
-                        <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded-full">
-                          {conversation.messages.length} messages
-                        </span>
-                      </div>
-                      <p className="text-sm text-gray-600 mb-3">{conversation.summary}</p>
-                      <div className="flex items-center space-x-4 text-xs text-gray-500">
-                        <div className="flex items-center space-x-1">
-                          <Clock className="h-3 w-3" />
-                          <span>{new Date(conversation.date).toLocaleDateString()}</span>
-                        </div>
-                        <div className="flex items-center space-x-1">
-                          <Bot className="h-3 w-3" />
-                          <span>AI Assistant</span>
-                        </div>
+            <>
+              {/* Conversations List with Date Grouping */}
+              <div className="space-y-6">
+                {(() => {
+                  const paginatedConversations = getPaginatedConversations();
+                  const groupedConversations = paginatedConversations.reduce((groups: any, conversation) => {
+                    const dateGroup = getDateGroup(conversation.date);
+                    if (!groups[dateGroup]) {
+                      groups[dateGroup] = [];
+                    }
+                    groups[dateGroup].push(conversation);
+                    return groups;
+                  }, {});
+
+                  return Object.entries(groupedConversations).map(([dateGroup, conversations]: [string, any]) => (
+                    <div key={dateGroup}>
+                      <h4 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3 flex items-center">
+                        <Calendar className="h-4 w-4 mr-2" />
+                        {dateGroup}
+                      </h4>
+                      <div className="space-y-3">
+                        {conversations.map((conversation: any) => (
+                          <div 
+                            key={conversation.id}
+                            className="border border-gray-200 rounded-lg p-4 hover:border-blue-300 hover:bg-blue-50 transition-colors cursor-pointer group"
+                            onClick={() => navigate('/chat', { state: { conversationId: conversation.id } })}
+                          >
+                            <div className="flex items-start justify-between">
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center space-x-3 mb-2">
+                                  <div className="bg-blue-100 p-2 rounded-full group-hover:bg-blue-200 transition-colors">
+                                    <MessageCircle className="h-4 w-4 text-blue-600" />
+                                  </div>
+                                  <div className="flex-1 min-w-0">
+                                    <h4 className="font-medium text-gray-900 truncate">{conversation.title}</h4>
+                                    <div className="flex items-center space-x-2 mt-1">
+                                      <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded-full">
+                                        {conversation.message_count || conversation.messages?.length || 0} messages
+                                      </span>
+                                      <span className="text-xs text-gray-500">
+                                        {new Date(conversation.date).toLocaleDateString()}
+                                      </span>
+                                    </div>
+                                  </div>
+                                </div>
+                                
+                                {conversation.summary && (
+                                  <p className="text-sm text-gray-600 mb-3 line-clamp-2">{conversation.summary}</p>
+                                )}
+                                
+                                <div className="flex items-center space-x-4 text-xs text-gray-500">
+                                  <div className="flex items-center space-x-1">
+                                    <Clock className="h-3 w-3" />
+                                    <span>{new Date(conversation.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                  </div>
+                                  <div className="flex items-center space-x-1">
+                                    <Bot className="h-3 w-3" />
+                                    <span>AI Assistant</span>
+                                  </div>
+                                </div>
+                              </div>
+                              
+                              <div className="ml-4 flex-shrink-0">
+                                <div className="w-2 h-2 bg-blue-500 rounded-full group-hover:bg-blue-600 transition-colors"></div>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
                       </div>
                     </div>
-                    <div className="text-right">
-                      <div className="text-xs text-gray-400 mb-1">
-                        {new Date(conversation.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                      </div>
-                      <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                  ));
+                })()}
+              </div>
+
+              {/* Pagination */}
+              {getTotalPages() > 1 && (
+                <div className="mt-6 flex items-center justify-between">
+                  <div className="text-sm text-gray-700">
+                    Showing {((currentPage - 1) * conversationsPerPage) + 1} to {Math.min(currentPage * conversationsPerPage, getProcessedConversations().length)} of {getProcessedConversations().length} conversations
+                  </div>
+                  
+                  <div className="flex items-center space-x-2">
+                    <button
+                      onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                      disabled={currentPage === 1}
+                      className="px-3 py-1 text-sm border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Previous
+                    </button>
+                    
+                    <div className="flex items-center space-x-1">
+                      {Array.from({ length: Math.min(5, getTotalPages()) }, (_, i) => {
+                        const pageNum = i + 1;
+                        return (
+                          <button
+                            key={pageNum}
+                            onClick={() => setCurrentPage(pageNum)}
+                            className={`px-3 py-1 text-sm rounded-md ${
+                              currentPage === pageNum
+                                ? 'bg-blue-600 text-white'
+                                : 'border border-gray-300 hover:bg-gray-50'
+                            }`}
+                          >
+                            {pageNum}
+                          </button>
+                        );
+                      })}
                     </div>
+                    
+                    <button
+                      onClick={() => setCurrentPage(Math.min(getTotalPages(), currentPage + 1))}
+                      disabled={currentPage === getTotalPages()}
+                      className="px-3 py-1 text-sm border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Next
+                    </button>
                   </div>
                 </div>
-              ))}
-            </div>
+              )}
+            </>
           )}
         </div>
 
@@ -550,14 +1003,22 @@ export default function Dashboard() {
                 </div>
               </button>
               
-              <button className="flex items-center space-x-3 p-4 border border-gray-200 rounded-lg hover:border-blue-300 hover:bg-blue-50 transition-colors">
-                <Settings className="h-5 w-5 text-blue-600" />
+              <button onClick={handleMigrateUsers} className="flex items-center space-x-3 p-4 border border-gray-200 rounded-lg hover:border-blue-300 hover:bg-blue-50 transition-colors disabled:opacity-50" disabled={isMigratingUsers}>
+                <RefreshCcw className={`h-5 w-5 ${isMigratingUsers ? 'text-gray-400 animate-spin' : 'text-blue-600'}`} />
                 <div className="text-left">
-                  <p className="font-medium text-gray-900">System Settings</p>
-                  <p className="text-sm text-gray-600">Configure system</p>
+                  <p className="font-medium text-gray-900">Migrate Users</p>
+                  <p className="text-sm text-gray-600">Move local users to database</p>
                 </div>
               </button>
             </div>
+          </div>
+        )}
+
+        {/* Migration Result Notice */}
+        {currentUser.role === 'admin' && migrationResult && (
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6 text-sm text-blue-800">
+            <div className="font-medium mb-1">User Migration Result</div>
+            <pre className="whitespace-pre-wrap">{migrationResult}</pre>
           </div>
         )}
 
@@ -575,12 +1036,44 @@ export default function Dashboard() {
                 </span>
                 <button
                   onClick={refreshUserList}
-                  className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+                  className="text-sm text-blue-600 hover:text-blue-700 font-medium mr-2"
                 >
                   Refresh
                 </button>
+                <button
+                  onClick={() => {
+                    localStorage.removeItem('users');
+                    localStorage.removeItem('dashboard_users');
+                    refreshUserList();
+                  }}
+                  className="text-sm text-red-600 hover:text-red-700 font-medium"
+                >
+                  Force Refresh
+                </button>
               </div>
             </div>
+
+            {/* User Statistics */}
+            {allUsers.length > 0 && (
+              <div className="mb-6 grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div className="bg-blue-50 p-4 rounded-lg">
+                  <div className="text-2xl font-bold text-blue-600">{allUsers.filter(u => u.role === 'admin').length}</div>
+                  <div className="text-sm text-blue-600">Admin Users</div>
+                </div>
+                <div className="bg-green-50 p-4 rounded-lg">
+                  <div className="text-2xl font-bold text-green-600">{allUsers.filter(u => u.role === 'user').length}</div>
+                  <div className="text-sm text-green-600">Regular Users</div>
+                </div>
+                <div className="bg-yellow-50 p-4 rounded-lg">
+                  <div className="text-2xl font-bold text-yellow-600">{allUsers.filter(u => u.role === 'moderator').length}</div>
+                  <div className="text-sm text-yellow-600">Moderators</div>
+                </div>
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <div className="text-2xl font-bold text-gray-600">{allUsers.filter(u => u.is_active).length}</div>
+                  <div className="text-sm text-gray-600">Active Users</div>
+                </div>
+              </div>
+            )}
 
             {isLoadingUsers ? (
               <div className="text-center py-8">
@@ -592,6 +1085,12 @@ export default function Dashboard() {
                 <Users className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                 <h4 className="text-lg font-medium text-gray-900 mb-2">No users found</h4>
                 <p className="text-gray-600">No registered users in the system.</p>
+                <button
+                  onClick={refreshUserList}
+                  className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                >
+                  Try Again
+                </button>
               </div>
             ) : (
               <div className="overflow-x-auto">
@@ -628,7 +1127,7 @@ export default function Dashboard() {
                             </div>
                             <div className="ml-3">
                               <div className="text-sm font-medium text-gray-900">
-                                {user.username.split('.')[0] || user.username} {user.username.split('.')[1] || ''}
+                                {formatDisplayName(user.username)}
                               </div>
                               <div className="text-sm text-gray-500">
                                 ID: {user.id}
@@ -762,7 +1261,7 @@ export default function Dashboard() {
               /* Conversations List */
               <div className="space-y-4">
                 {filteredChats.length > 0 ? (
-                  filteredChats.map((chat, index) => (
+                  filteredChats.map((chat) => (
                     <div key={chat.id} className="border border-gray-200 rounded-lg p-4 hover:border-blue-300 transition-colors">
                       <div className="flex items-center justify-between mb-2">
                         <div className="flex items-center space-x-3">

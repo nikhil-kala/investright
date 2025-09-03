@@ -39,10 +39,15 @@ export default function Login() {
       });
 
       if (result.success) {
+        // Dispatch custom auth event to notify other components
+        window.dispatchEvent(new CustomEvent('auth-state-changed', { 
+          detail: { user: result.user, action: 'login' } 
+        }));
+        
         // Redirect based on the intended destination
         if (returnToChat) {
-          // Return to home page with chat open
-          navigate('/', { state: { openChat: true }, replace: true });
+          // Return to chat page
+          navigate('/chat', { replace: true });
         } else {
           // Default to dashboard
           navigate('/dashboard', { replace: true });

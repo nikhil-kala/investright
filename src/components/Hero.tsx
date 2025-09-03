@@ -1,9 +1,11 @@
 import React from 'react';
-import { ArrowRight, Scale, Users, Settings } from 'lucide-react';
+import { ArrowRight, Scale, Users, Settings, MessageCircle } from 'lucide-react';
 import { useLanguage } from '../hooks/useLanguage';
+import { useNavigate } from 'react-router-dom';
 
 export default function Hero() {
   const { t } = useLanguage();
+  const navigate = useNavigate();
 
   return (
     <section className="bg-gradient-to-br from-blue-50 to-indigo-100 py-20">
@@ -20,11 +22,18 @@ export default function Hero() {
           </p>
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center mb-12">
-            <button className="bg-blue-700 text-white px-8 py-4 rounded-lg hover:bg-blue-800 transition-all duration-200 font-semibold text-lg flex items-center justify-center gap-2 shadow-lg hover:shadow-xl">
+            <button 
+              onClick={() => navigate('/chat')}
+              className="bg-blue-700 text-white px-8 py-4 rounded-lg hover:bg-blue-800 transition-all duration-200 font-semibold text-lg flex items-center justify-center gap-2 shadow-lg hover:shadow-xl"
+            >
+              <MessageCircle className="h-5 w-5" />
+              Start Chatting
+            </button>
+            <button className="bg-green-600 text-white px-8 py-4 rounded-lg hover:bg-green-700 transition-all duration-200 font-semibold text-lg flex items-center justify-center gap-2 shadow-lg hover:shadow-xl">
               {t.hero.startInvesting}
               <ArrowRight className="h-5 w-5" />
             </button>
-            <button className="border-2 border-blue-700 text-blue-700 px-8 py-4 rounded-lg hover:bg-blue-700 hover:text-white transition-all duration-200 font-semibold text-lg">
+            <button className="border-2 border-blue-700 text-blue-700 px-8 py-4 rounded-lg hover:bg-blue-700 hover:text-white transition-colors font-semibold text-lg">
               {t.hero.learnMore}
             </button>
           </div>

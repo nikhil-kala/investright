@@ -35,11 +35,34 @@ export default function Profile() {
     const user = authService.getCurrentUser();
     if (user) {
       setCurrentUser(user);
-      setProfileData({
-        firstName: user.username.split('.')[0] || '',
-        lastName: user.username.split('.')[1] || '',
-        email: user.email
-      });
+      
+      // Try to load saved profile data from localStorage first
+      const savedProfile = localStorage.getItem(`profile_${user.id}`);
+      if (savedProfile) {
+        try {
+          const parsedProfile = JSON.parse(savedProfile);
+          setProfileData({
+            firstName: parsedProfile.firstName || user.username.split('.')[0] || '',
+            lastName: parsedProfile.lastName || user.username.split('.')[1] || '',
+            email: parsedProfile.email || user.email
+          });
+        } catch (error) {
+          console.error('Error parsing saved profile:', error);
+          // Fallback to user data
+          setProfileData({
+            firstName: user.username.split('.')[0] || '',
+            lastName: user.username.split('.')[1] || '',
+            email: user.email
+          });
+        }
+      } else {
+        // No saved profile, use user data
+        setProfileData({
+          firstName: user.username.split('.')[0] || '',
+          lastName: user.username.split('.')[1] || '',
+          email: user.email
+        });
+      }
     }
     setIsLoading(false);
   }, [navigate]);
@@ -56,21 +79,53 @@ export default function Profile() {
     if (!currentUser) return;
     
     try {
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      localStorage.setItem(`profile_${currentUser.id}`, JSON.stringify(profileData));
-      setIsEditing(false);
-      alert('Profile updated successfully!');
+      // Validate input
+      if (!profileData.firstName.trim() || !profileData.lastName.trim()) {
+        alert('First name and last name are required!');
+        return;
+      }
+
+      if (!profileData.email.trim()) {
+        alert('Email is required!');
+        return;
+      }
+
+      // Call the auth service to update the profile
+      const result = await authService.updateUserProfile(
+        currentUser.id,
+        profileData.firstName.trim(),
+        profileData.lastName.trim(),
+        profileData.email.trim()
+      );
+
+      if (result.success) {
+        // Update the current user state with the new data
+        if (result.user) {
+          setCurrentUser(result.user);
+        }
+        
+        // Also save to localStorage as backup
+        localStorage.setItem(`profile_${currentUser.id}`, JSON.stringify(profileData));
+        
+        setIsEditing(false);
+        alert('Profile updated successfully!');
+      } else {
+        alert(`Error updating profile: ${result.message}`);
+      }
     } catch (error) {
+      console.error('Error saving profile:', error);
       alert('Error saving profile. Please try again.');
     }
   };
 
   const handleCancel = () => {
     if (currentUser) {
-      const savedProfile = localStorage.getItem(`profile_${currentUser.id}`);
-      if (savedProfile) {
-        setProfileData(JSON.parse(savedProfile));
-      }
+      // Reset to the current user's data
+      setProfileData({
+        firstName: currentUser.username.split('.')[0] || '',
+        lastName: currentUser.username.split('.')[1] || '',
+        email: currentUser.email
+      });
     }
     setIsEditing(false);
   };

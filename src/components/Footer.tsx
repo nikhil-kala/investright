@@ -6,11 +6,11 @@ export default function Footer() {
   const { t } = useLanguage();
 
   return (
-    <footer className="bg-gray-900 text-white py-16">
+    <footer className="bg-gray-900 text-white py-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex flex-col md:flex-row justify-between items-start">
           <div className="flex-1">
-            <div className="flex items-center space-x-3 mb-6">
+            <div className="flex items-center space-x-3 mb-4">
               {/* InvestRight Logo */}
               <div className="relative">
                 <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-blue-800 rounded-lg flex items-center justify-center">
@@ -43,10 +43,7 @@ export default function Footer() {
               </div>
             </div>
             <div className="flex space-x-4 mb-4">
-              <div className="flex items-center space-x-2 text-gray-300">
-                <Mail className="h-4 w-4" />
-                <span className="text-sm">wealth@investright.club</span>
-              </div>
+              {/* Email moved to second row */}
             </div>
             <div className="text-gray-400 text-sm">
               {t.footer.copyright}
@@ -54,9 +51,23 @@ export default function Footer() {
           </div>
 
           <div className="md:ml-auto">
-            <ul className="flex gap-8 text-gray-300">
-              <li><a href="#" className="hover:text-white transition-colors whitespace-nowrap">{t.footer.contact}</a></li>
-            </ul>
+            <div className="flex flex-col space-y-2">
+              {/* Email Section */}
+              <div className="flex items-center space-x-2 text-gray-300">
+                <Mail className="h-4 w-4" />
+                <span className="text-sm">wealth@investright.club</span>
+              </div>
+              
+              {/* Contact Menu */}
+              <ul className="flex gap-8 text-gray-300">
+                <li>
+                  <a href="/contact" className="hover:text-white transition-colors whitespace-nowrap flex items-center space-x-2">
+                    <Phone className="h-4 w-4" />
+                    <span>{t.footer.contact}</span>
+                  </a>
+                </li>
+              </ul>
+            </div>
           </div>
         </div>
       </div>
