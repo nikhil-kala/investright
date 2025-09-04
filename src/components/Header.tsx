@@ -1,12 +1,11 @@
 import React from 'react';
 import { Menu, X, User, Shield, MessageCircle, ChevronDown, LogOut } from 'lucide-react';
 import { useLanguage } from '../hooks/useLanguage';
-import LanguageSelector from './LanguageSelector';
 import { Link, useLocation } from 'react-router-dom';
 import { authService } from '../services/authService';
 
 export default function Header() {
-  const { t, currentLanguage, changeLanguage } = useLanguage();
+  const { t } = useLanguage();
   const [isMenuOpen, setIsMenuOpen] = React.useState(false);
   const [isAuthenticated, setIsAuthenticated] = React.useState(false);
   const [isUserDropdownOpen, setIsUserDropdownOpen] = React.useState(false);
@@ -120,10 +119,6 @@ export default function Header() {
             >
               Contact
             </Link>
-            <LanguageSelector 
-              currentLanguage={currentLanguage}
-              onLanguageChange={changeLanguage}
-            />
             {isAuthenticated ? (
               <div className="relative user-dropdown">
                 {/* User Email Display with Dropdown */}
@@ -226,10 +221,6 @@ export default function Header() {
                 </span>
               </div>
             )}
-            <LanguageSelector 
-              currentLanguage={currentLanguage}
-              onLanguageChange={changeLanguage}
-            />
             <button
               onClick={() => setIsMenuOpen(!isMenuOpen)}
               className="text-gray-700 hover:text-blue-700 transition-colors"
