@@ -124,24 +124,19 @@ export default function Chat() {
     }
   };
 
-  // Enhanced function to scroll chat container to bottom
-  const scrollChatToBottom = () => {
-    setTimeout(() => {
-      console.log('Chat: Enhanced scrolling triggered');
-      if (chatContainerRef.current) {
-        chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
-        console.log('Chat: Scrolled chat container to bottom');
-      }
-      // Also use the messagesEndRef as backup
-      if (messagesEndRef.current) {
-        messagesEndRef.current.scrollIntoView({ 
-          behavior: 'smooth',
-          block: 'end'
-        });
-        console.log('Chat: Scrolled messages end ref to bottom');
-      }
-    }, 150); // Slightly longer delay for more reliable scrolling
-  };
+  // Debounced scroll function to prevent excessive scrolling
+  const scrollChatToBottom = (() => {
+    let scrollTimeout: NodeJS.Timeout;
+    return () => {
+      clearTimeout(scrollTimeout);
+      scrollTimeout = setTimeout(() => {
+        if (chatContainerRef.current) {
+          chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
+          console.log('Chat: Scrolled chat container to bottom');
+        }
+      }, 50); // Debounce scroll calls by 50ms
+    };
+  })();
 
   // Migrate any existing localStorage chats to DB as a guest (unauthenticated)
   const migrateLocalChatsAsGuest = async () => {
@@ -255,11 +250,6 @@ export default function Chat() {
     if (!isTyping && !isGeneratingPlan) {
       focusInputAfterMessage();
     }
-    
-    // Scroll when typing state changes to ensure typing indicator is visible
-    if (isTyping) {
-      setTimeout(() => scrollChatToBottom(), 100);
-    }
   }, [isTyping, isGeneratingPlan]);
 
   useEffect(() => {
@@ -333,9 +323,8 @@ export default function Chat() {
 
   // Auto-scroll to bottom when messages change
   useEffect(() => {
-    // Use enhanced scrolling for better reliability
     scrollChatToBottom();
-  }, [messages, isTyping, isGeneratingPlan]);
+  }, [messages]);
 
   // Fallback authentication check when component mounts
   useEffect(() => {
@@ -409,8 +398,7 @@ export default function Chat() {
             };
             setMessages([initialMessage]);
             
-            // Scroll to bottom after initial message
-            setTimeout(() => scrollChatToBottom(), 200);
+            // Scroll will be handled by useEffect
             
             // Save initial conversation to database if authenticated
             if (isUserAuthenticated && userEmail) {
@@ -455,8 +443,7 @@ export default function Chat() {
             };
             setMessages([fallbackMessage]);
             
-            // Scroll to bottom after fallback message
-            setTimeout(() => scrollChatToBottom(), 200);
+            // Scroll will be handled by useEffect
             
             // Store fallback message in Supabase if user is authenticated
             if (isUserAuthenticated && userEmail && sessionResult) {
@@ -496,8 +483,7 @@ export default function Chat() {
           };
           setMessages([fallbackMessage]);
           
-          // Scroll to bottom after fallback message
-          setTimeout(() => scrollChatToBottom(), 200);
+          // Scroll will be handled by useEffect
           
           // Store fallback message in Supabase if user is authenticated
             if (isUserAuthenticated && userEmail && sessionResult) {
@@ -548,7 +534,7 @@ export default function Chat() {
               setMessages(parsed.messages);
               setCurrentConversationId(parsed.conversationId);
             // no-op: emailSubmitted removed
-              setTimeout(() => scrollChatToBottom(), 200);
+              // Scroll will be handled by useEffect
               setTimeout(() => {
                 handleSavePendingConversation();
             }, 500);
@@ -584,8 +570,7 @@ export default function Chat() {
         setCurrentConversationId(result.conversation.id);
         // no-op: emailSubmitted removed
         
-        // Scroll to bottom after loading conversation
-        setTimeout(() => scrollChatToBottom(), 200);
+        // Scroll will be handled by useEffect
       }
     } catch (error) {
       console.error('Error loading conversation:', error);
@@ -597,8 +582,7 @@ export default function Chat() {
         setMessages(conversation.messages);
         // no-op: emailSubmitted removed
         
-        // Scroll to bottom after loading conversation from localStorage
-        setTimeout(() => scrollChatToBottom(), 200);
+        // Scroll will be handled by useEffect
       }
     }
   };

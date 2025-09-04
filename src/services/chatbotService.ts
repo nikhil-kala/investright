@@ -45,6 +45,210 @@ Sample format:
 ${samples.join('\n')}`;
 };
 
+// Function to determine current step in the conversation
+const determineCurrentStep = (conversationHistory: Array<{ role: 'user' | 'assistant', content: string }>, extracted: any): string => {
+  const allUserMessages = conversationHistory.filter(msg => msg.role === 'user').map(msg => msg.content).join(' ').toLowerCase();
+  
+  // Step 3.1: Goal, Amount & Timeline Collection
+  if (!extracted.amount || !extracted.timeline) {
+    return 'goal_amount_timeline';
+  }
+  
+  // Step 3.2: Income Source & Monthly Savings Assessment
+  if (!extracted.income || !extracted.monthlyInvestment) {
+    return 'income_savings';
+  }
+  
+  // Step 3.3: Existing Savings & Assets Check
+  if (!extracted.existingSavings && !allUserMessages.includes('existing') && !allUserMessages.includes('savings') && !allUserMessages.includes('investment') && !allUserMessages.includes('asset')) {
+    return 'existing_savings';
+  }
+  
+  // Step 3.4: Goal Feasibility Analysis
+  if (extracted.amount && extracted.timeline && extracted.income && extracted.monthlyInvestment) {
+    return 'feasibility_analysis';
+  }
+  
+  // Default to income assessment if we have goal but not income
+  return 'income_savings';
+};
+
+// Function to generate step-based questions
+const generateStepBasedQuestion = async (
+  currentStep: string,
+  conversationHistory: Array<{ role: 'user' | 'assistant', content: string }>,
+  extracted: any,
+  userInfo?: { username?: string; isAuthenticated?: boolean }
+): Promise<{ success: boolean; message: string; isGeneratingPlan?: boolean }> => {
+  try {
+    const userName = userInfo?.username || '';
+    const greeting = userName ? `${userName}, ` : '';
+    
+    switch (currentStep) {
+      case 'goal_amount_timeline':
+        if (!extracted.amount) {
+          return {
+            success: true,
+            message: `${greeting}What is the target amount for your goal? If you're not sure about the cost, I can help you research current market prices.
+
+Sample format:
+• "50 lakhs" or "1 crore"
+• "Around ₹75 lakhs in my city"
+• "Between 60-80 lakhs depending on location"
+• "I'm not sure about the cost"`
+
+          };
+        }
+        if (!extracted.timeline) {
+          return {
+            success: true,
+            message: `${greeting}What is your target timeline for achieving this goal?
+
+Sample format:
+• "5 years" or "10 years"
+• "I want to buy a house in 3 years"
+• "My child will start college in 8 years"`
+
+          };
+        }
+        // If we have both amount and timeline, move to next step
+        return generateStepBasedQuestion('income_savings', conversationHistory, extracted, userInfo);
+        
+      case 'income_savings':
+        return {
+          success: true,
+          message: `${greeting}What is your current monthly income and how much can you invest monthly towards this goal?
+
+Sample format:
+• "₹50,000 per month, can invest ₹20,000"
+• "I earn ₹8 LPA, can save ₹30,000 monthly"
+• "Monthly income ₹1.2 lakhs, investment capacity ₹40,000"`
+
+        };
+        
+      case 'existing_savings':
+        return {
+          success: true,
+          message: `${greeting}Do you have any existing savings or investments that we can consider for this goal?
+
+Sample format:
+• "I have ₹2 lakhs in FDs"
+• "₹5 lakhs in mutual funds already"
+• "No existing savings, starting fresh"`
+
+        };
+        
+      case 'feasibility_analysis':
+        // Perform feasibility analysis and provide results
+        return await performFeasibilityAnalysis(conversationHistory, extracted, userInfo);
+        
+      default:
+        return {
+          success: true,
+          message: `${greeting}Could you share more details about your financial situation?`
+        };
+    }
+  } catch (error) {
+    console.error('Error in generateStepBasedQuestion:', error);
+    return {
+      success: true,
+      message: `${greeting}Could you tell me more about your financial goals?`
+    };
+  }
+};
+
+// Function to perform feasibility analysis
+const performFeasibilityAnalysis = async (
+  conversationHistory: Array<{ role: 'user' | 'assistant', content: string }>,
+  extracted: any,
+  userInfo?: { username?: string; isAuthenticated?: boolean }
+): Promise<{ success: boolean; message: string; isGeneratingPlan?: boolean }> => {
+  try {
+    const userName = userInfo?.username || '';
+    const greeting = userName ? `${userName}, ` : '';
+    
+    // Extract key information
+    const goalAmount = extracted.amount || 0;
+    const timeline = extracted.timeline || 0;
+    const monthlyInvestment = extracted.monthlyInvestment || 0;
+    const existingSavings = extracted.existingSavings || 0;
+    
+    // Calculate feasibility
+    const annualReturn = 0.10; // 10% annual return
+    const monthlyReturn = annualReturn / 12;
+    const totalMonths = timeline * 12;
+    
+    // Future value of existing savings
+    const futureValueExisting = existingSavings * Math.pow(1 + annualReturn, timeline);
+    
+    // Future value of monthly investments (SIP)
+    const futureValueSIP = monthlyInvestment * ((Math.pow(1 + monthlyReturn, totalMonths) - 1) / monthlyReturn) * (1 + monthlyReturn);
+    
+    const totalAccumulation = futureValueExisting + futureValueSIP;
+    const shortfall = goalAmount - totalAccumulation;
+    
+    if (totalAccumulation >= goalAmount) {
+      // Goal is achievable
+      const surplus = totalAccumulation - goalAmount;
+      return {
+        success: true,
+        message: `${greeting}Let me calculate if your goal is achievable:
+
+**Current Resources:**
+• Existing Savings: ₹${(existingSavings / 100000).toFixed(1)} lakhs
+• Monthly Investment: ₹${(monthlyInvestment / 1000).toFixed(1)}k
+• Timeline: ${timeline} years
+• Expected Returns: 10%* annually
+
+**Calculation:**
+• Future Value of ₹${(existingSavings / 100000).toFixed(1)} lakhs in ${timeline} years: ₹${(futureValueExisting / 100000).toFixed(1)} lakhs*
+• Future Value of ₹${(monthlyInvestment / 1000).toFixed(1)}k monthly SIP: ₹${(futureValueSIP / 100000).toFixed(1)} lakhs*
+• **Total Accumulation: ₹${(totalAccumulation / 100000).toFixed(1)} lakhs***
+
+**Result: ✅ GOAL IS ACHIEVABLE!** You'll have ₹${(surplus / 100000).toFixed(1)} lakhs* more than needed.
+
+Let me create your personalized investment plan...`,
+        isGeneratingPlan: true
+      };
+    } else {
+      // Goal is not achievable
+      return {
+        success: true,
+        message: `${greeting}Let me calculate if your goal is achievable:
+
+**Current Resources:**
+• Existing Savings: ₹${(existingSavings / 100000).toFixed(1)} lakhs
+• Monthly Investment: ₹${(monthlyInvestment / 1000).toFixed(1)}k
+• Timeline: ${timeline} years
+• Expected Returns: 10%* annually
+
+**Calculation:**
+• Future Value of ₹${(existingSavings / 100000).toFixed(1)} lakhs in ${timeline} years: ₹${(futureValueExisting / 100000).toFixed(1)} lakhs*
+• Future Value of ₹${(monthlyInvestment / 1000).toFixed(1)}k monthly SIP: ₹${(futureValueSIP / 100000).toFixed(1)} lakhs*
+• **Total Accumulation: ₹${(totalAccumulation / 100000).toFixed(1)} lakhs***
+
+**Result: ❌ GOAL IS NOT ACHIEVABLE** - You'll be short by ₹${(shortfall / 100000).toFixed(1)} lakhs*
+
+Since your current capacity won't achieve this goal, let me suggest alternatives:
+
+**What is your profession?** This will help me provide targeted advice.
+
+Sample format:
+• "Software Engineer"
+• "Business Owner"
+• "Government Employee"`
+
+      };
+    }
+  } catch (error) {
+    console.error('Error in performFeasibilityAnalysis:', error);
+    return {
+      success: true,
+      message: `${greeting}I need to gather more information to analyze your goal feasibility. Could you share your profession and current financial situation?`
+    };
+  }
+};
+
 // Function to convert Indian number formats to numeric values
 const convertIndianNumberFormat = (text: string): number | null => {
   try {
@@ -323,12 +527,14 @@ const extractFinancialFigures = (userInput: string): {
   timeline?: number;
   monthlyInvestment?: number;
   income?: number;
+  existingSavings?: number;
 } => {
   const result: {
     amount?: number;
     timeline?: number;
     monthlyInvestment?: number;
     income?: number;
+    existingSavings?: number;
   } = {};
   
   try {
@@ -391,6 +597,23 @@ const extractFinancialFigures = (userInput: string): {
         const amount = convertIndianNumberFormat(standaloneNumbers[0]);
         if (amount) {
           result.amount = amount;
+        }
+      }
+    }
+    
+    // Check for existing savings patterns
+    const existingSavingsPatterns = [
+      /(?:have|existing|savings|saved|invested|fd|mutual fund|asset).*?(\d+(?:\.\d+)?)\s*(lakh|lacs|crore|crores|thousand|k|cr|l|t)/gi,
+      /(\d+(?:\.\d+)?)\s*(lakh|lacs|crore|crores|thousand|k|cr|l|t).*?(?:savings|fd|mutual fund|investment|asset)/gi
+    ];
+    
+    for (const pattern of existingSavingsPatterns) {
+      const match = userInput.match(pattern);
+      if (match) {
+        const amount = convertIndianNumberFormat(match[0]);
+        if (amount && !result.existingSavings) {
+          result.existingSavings = amount;
+          break;
         }
       }
     }
@@ -1085,20 +1308,20 @@ export const sendChatMessageToGemini = async (
       }
     }
     
-    // Continue with intelligent questions if we need more information
+    // Follow the step-by-step process for goal analysis
     if (conversationHistory.length >= (userInfo?.isAuthenticated ? 3 : 4)) {
-      console.log('ChatbotService: Need more information, generating intelligent follow-up question');
+      console.log('ChatbotService: Following step-by-step process for goal analysis');
       
-      // Use complexity analysis to determine the type of question needed
-      const complexity = analyzeUserInputComplexity(userMessage, conversationHistory);
+      // Analyze what information we have and what step we're on
+      const allUserMessages = conversationHistory.filter(msg => msg.role === 'user').map(msg => msg.content).join(' ');
+      const allExtracted = extractFinancialFigures(allUserMessages);
       
-      if (complexity.complexity === 'high' || complexity.suggestedQuestions.length > 0) {
-        // Generate adaptive questions based on complexity analysis
-        return await generateAdaptiveQuestion(userMessage, conversationHistory, complexity, userInfo);
-      } else {
-        // Use standard question generation for simpler cases
-      return await generateRelevantQuestion(userMessage, conversationHistory, userInfo);
-      }
+      // Determine current step based on conversation history
+      const currentStep = determineCurrentStep(conversationHistory, allExtracted);
+      console.log('ChatbotService: Current step:', currentStep);
+      
+      // Generate appropriate question based on current step
+      return await generateStepBasedQuestion(currentStep, conversationHistory, allExtracted, userInfo);
     }
 
     // Default fallback

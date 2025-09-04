@@ -43,82 +43,22 @@ export default function Chatbot({ openChat = false, conversationId }: ChatbotPro
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const scrollToBottom = () => {
-    console.log('🔄 scrollToBottom called');
-    // Add a small delay to ensure DOM is fully updated before scrolling
-    setTimeout(() => {
-      if (messagesEndRef.current) {
-        console.log('🔄 Executing smooth scroll to bottom');
-        messagesEndRef.current.scrollIntoView({ 
-          behavior: 'smooth',
-          block: 'end',
-          inline: 'nearest'
-        });
-      } else {
-        console.log('⚠️ messagesEndRef.current is null');
-      }
-    }, 100);
-  };
-
-  // Force scroll to bottom immediately (for when user sends a message)
-  const forceScrollToBottom = () => {
-    console.log('🚀 forceScrollToBottom called');
-    if (messagesEndRef.current) {
-      console.log('🚀 Executing immediate scroll to bottom');
-      messagesEndRef.current.scrollIntoView({ 
-        behavior: 'auto',
-        block: 'end',
-        inline: 'nearest'
-      });
-    } else {
-      console.log('⚠️ messagesEndRef.current is null in forceScrollToBottom');
-    }
-  };
-
-  // Scroll to show the latest AI response/question clearly
-  const scrollToShowLatestResponse = () => {
-    console.log('📱 scrollToShowLatestResponse called');
-    setTimeout(() => {
-      if (messagesEndRef.current) {
-        console.log('📱 Executing scroll to show latest response');
-        // Scroll to show the latest message with some context above it
-        messagesEndRef.current.scrollIntoView({ 
-          behavior: 'smooth',
-          block: 'center', // Center the latest message for better visibility
-          inline: 'nearest'
-        });
-      } else {
-        console.log('⚠️ messagesEndRef.current is null in scrollToShowLatestResponse');
-      }
-    }, 150); // Slightly longer delay to ensure AI response is fully rendered
-  };
-
-  // Scroll to show conversation context (user message + AI response)
-  const scrollToShowConversationContext = () => {
-    console.log('💬 scrollToShowConversationContext called');
-    setTimeout(() => {
-      if (messagesEndRef.current) {
-        console.log('💬 Executing scroll to show conversation context');
-        // Scroll to show the latest messages with context above
-        messagesEndRef.current.scrollIntoView({ 
-          behavior: 'smooth',
-          block: 'nearest', // Show the latest message at the bottom with context above
-          inline: 'nearest'
-        });
-        
-        // Additional scroll adjustment to ensure good visibility
-        setTimeout(() => {
-          const chatContainer = document.querySelector('.chat-messages-container');
-          if (chatContainer) {
-            chatContainer.scrollTop = chatContainer.scrollHeight;
-            console.log('💬 Additional scroll adjustment applied');
-          }
-        }, 100);
-      } else {
-        console.log('⚠️ messagesEndRef.current is null in scrollToShowConversationContext');
-      }
-    }, 200); // Longer delay to ensure all content is rendered
-  };
+  // Debounced scroll function to prevent excessive scrolling
+  const scrollToBottom = (() => {
+    let scrollTimeout: NodeJS.Timeout;
+    return () => {
+      clearTimeout(scrollTimeout);
+      scrollTimeout = setTimeout(() => {
+        if (messagesEndRef.current) {
+          messagesEndRef.current.scrollIntoView({ 
+            behavior: 'smooth',
+            block: 'end',
+            inline: 'nearest'
+          });
+        }
+      }, 50); // Debounce scroll calls by 50ms
+    };
+  })();
 
   const focusInput = () => {
     // Focus the input field after a short delay to ensure DOM is updated
@@ -160,20 +100,6 @@ export default function Chatbot({ openChat = false, conversationId }: ChatbotPro
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
-
-  // Also scroll to show conversation context when typing state changes
-  useEffect(() => {
-    if (!isTyping) {
-      scrollToShowConversationContext();
-    }
-  }, [isTyping]);
-
-  // Also scroll to show conversation context when plan generation state changes
-  useEffect(() => {
-    if (!isGeneratingPlan) {
-      scrollToShowConversationContext();
-    }
-  }, [isGeneratingPlan]);
 
   // Debug: Log state changes
   useEffect(() => {
