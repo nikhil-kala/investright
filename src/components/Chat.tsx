@@ -130,10 +130,10 @@ export default function Chat() {
     return () => {
       clearTimeout(scrollTimeout);
       scrollTimeout = setTimeout(() => {
-        if (chatContainerRef.current) {
-          chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
-          console.log('Chat: Scrolled chat container to bottom');
-        }
+      if (chatContainerRef.current) {
+        chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
+        console.log('Chat: Scrolled chat container to bottom');
+      }
       }, 50); // Debounce scroll calls by 50ms
     };
   })();

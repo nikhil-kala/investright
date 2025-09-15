@@ -48,19 +48,38 @@ ${samples.join('\n')}`;
 // Function to determine current step in the conversation
 const determineCurrentStep = (conversationHistory: Array<{ role: 'user' | 'assistant', content: string }>, extracted: any): string => {
   const allUserMessages = conversationHistory.filter(msg => msg.role === 'user').map(msg => msg.content).join(' ').toLowerCase();
+  const allAssistantMessages = conversationHistory.filter(msg => msg.role === 'assistant').map(msg => msg.content).join(' ').toLowerCase();
+  
+  // Check what questions have already been asked
+  const hasAskedAmount = allAssistantMessages.includes('target amount') || allAssistantMessages.includes('cost') || allAssistantMessages.includes('budget');
+  const hasAskedTimeline = allAssistantMessages.includes('timeline') || allAssistantMessages.includes('years') || allAssistantMessages.includes('when');
+  const hasAskedIncome = allAssistantMessages.includes('income') || allAssistantMessages.includes('salary') || allAssistantMessages.includes('earn') || allAssistantMessages.includes('lpa');
+  const hasAskedInvestment = allAssistantMessages.includes('invest') || allAssistantMessages.includes('save') || allAssistantMessages.includes('monthly');
+  const hasAskedSavings = allAssistantMessages.includes('existing') || allAssistantMessages.includes('savings') || allAssistantMessages.includes('fd') || allAssistantMessages.includes('mutual fund');
+  
+  console.log('Step determination - Questions asked:', {
+    hasAskedAmount,
+    hasAskedTimeline,
+    hasAskedIncome,
+    hasAskedInvestment,
+    hasAskedSavings
+  });
   
   // Step 3.1: Goal, Amount & Timeline Collection
-  if (!extracted.amount || !extracted.timeline) {
+  if (!extracted.amount && !hasAskedAmount) {
+    return 'goal_amount_timeline';
+  }
+  if (extracted.amount && !extracted.timeline && !hasAskedTimeline) {
     return 'goal_amount_timeline';
   }
   
   // Step 3.2: Income Source & Monthly Savings Assessment
-  if (!extracted.income || !extracted.monthlyInvestment) {
+  if ((!extracted.income || !extracted.monthlyInvestment) && !hasAskedIncome) {
     return 'income_savings';
   }
   
   // Step 3.3: Existing Savings & Assets Check
-  if (!extracted.existingSavings && !allUserMessages.includes('existing') && !allUserMessages.includes('savings') && !allUserMessages.includes('investment') && !allUserMessages.includes('asset')) {
+  if (!extracted.existingSavings && !hasAskedSavings && !allUserMessages.includes('existing') && !allUserMessages.includes('savings') && !allUserMessages.includes('investment') && !allUserMessages.includes('asset')) {
     return 'existing_savings';
   }
   
@@ -69,8 +88,28 @@ const determineCurrentStep = (conversationHistory: Array<{ role: 'user' | 'assis
     return 'feasibility_analysis';
   }
   
-  // Default to income assessment if we have goal but not income
-  return 'income_savings';
+  // If we have all basic info but haven't asked about existing savings, ask that
+  if (extracted.amount && extracted.timeline && extracted.income && !hasAskedSavings) {
+    return 'existing_savings';
+  }
+  
+  // If we have goal and timeline but no income info, ask for income
+  if (extracted.amount && extracted.timeline && !extracted.income && !hasAskedIncome) {
+    return 'income_savings';
+  }
+  
+  // If we have goal but no timeline, ask for timeline
+  if (extracted.amount && !extracted.timeline && !hasAskedTimeline) {
+    return 'goal_amount_timeline';
+  }
+  
+  // If we have goal but no amount, ask for amount
+  if (!extracted.amount && !hasAskedAmount) {
+    return 'goal_amount_timeline';
+  }
+  
+  // Default to feasibility analysis if we have enough info
+  return 'feasibility_analysis';
 };
 
 // Function to generate step-based questions
@@ -84,9 +123,35 @@ const generateStepBasedQuestion = async (
     const userName = userInfo?.username || '';
     const greeting = userName ? `${userName}, ` : '';
     
+    // Check if we've already asked the same question recently
+    const recentAssistantMessages = conversationHistory
+      .filter(msg => msg.role === 'assistant')
+      .slice(-3) // Check last 3 assistant messages
+      .map(msg => msg.content.toLowerCase());
+    
+    const hasRecentlyAskedAmount = recentAssistantMessages.some(msg => 
+      msg.includes('target amount') || msg.includes('cost') || msg.includes('budget')
+    );
+    const hasRecentlyAskedTimeline = recentAssistantMessages.some(msg => 
+      msg.includes('timeline') || msg.includes('years') || msg.includes('when')
+    );
+    const hasRecentlyAskedIncome = recentAssistantMessages.some(msg => 
+      msg.includes('income') || msg.includes('salary') || msg.includes('earn') || msg.includes('lpa')
+    );
+    const hasRecentlyAskedSavings = recentAssistantMessages.some(msg => 
+      msg.includes('existing') || msg.includes('savings') || msg.includes('fd') || msg.includes('mutual fund')
+    );
+    
+    console.log('Question generation - Recent questions asked:', {
+      hasRecentlyAskedAmount,
+      hasRecentlyAskedTimeline,
+      hasRecentlyAskedIncome,
+      hasRecentlyAskedSavings
+    });
+    
     switch (currentStep) {
       case 'goal_amount_timeline':
-        if (!extracted.amount) {
+        if (!extracted.amount && !hasRecentlyAskedAmount) {
           return {
             success: true,
             message: `${greeting}What is the target amount for your goal? If you're not sure about the cost, I can help you research current market prices.
@@ -99,7 +164,7 @@ Sample format:
 
           };
         }
-        if (!extracted.timeline) {
+        if (extracted.amount && !extracted.timeline && !hasRecentlyAskedTimeline) {
           return {
             success: true,
             message: `${greeting}What is your target timeline for achieving this goal?
@@ -112,30 +177,51 @@ Sample format:
           };
         }
         // If we have both amount and timeline, move to next step
-        return generateStepBasedQuestion('income_savings', conversationHistory, extracted, userInfo);
-        
-      case 'income_savings':
+        if (extracted.amount && extracted.timeline) {
+          return generateStepBasedQuestion('income_savings', conversationHistory, extracted, userInfo);
+        }
+        // If we've already asked recently, wait for user response
         return {
           success: true,
-          message: `${greeting}What is your current monthly income and how much can you invest monthly towards this goal?
+          message: `${greeting}I'm waiting for your response to help me understand your goal better.`
+        };
+        
+      case 'income_savings':
+        if (!hasRecentlyAskedIncome) {
+          return {
+            success: true,
+            message: `${greeting}What is your current monthly income and how much can you invest monthly towards this goal?
 
 Sample format:
 • "₹50,000 per month, can invest ₹20,000"
 • "I earn ₹8 LPA, can save ₹30,000 monthly"
 • "Monthly income ₹1.2 lakhs, investment capacity ₹40,000"`
 
+          };
+        }
+        // If we've already asked recently, wait for user response
+        return {
+          success: true,
+          message: `${greeting}I'm waiting for your income and investment details to proceed with the analysis.`
         };
         
       case 'existing_savings':
-        return {
-          success: true,
-          message: `${greeting}Do you have any existing savings or investments that we can consider for this goal?
+        if (!hasRecentlyAskedSavings) {
+          return {
+            success: true,
+            message: `${greeting}Do you have any existing savings or investments that we can consider for this goal?
 
 Sample format:
 • "I have ₹2 lakhs in FDs"
 • "₹5 lakhs in mutual funds already"
 • "No existing savings, starting fresh"`
 
+          };
+        }
+        // If we've already asked recently, wait for user response
+        return {
+          success: true,
+          message: `${greeting}I'm waiting for your existing savings information to complete the analysis.`
         };
         
       case 'feasibility_analysis':
@@ -1315,6 +1401,25 @@ export const sendChatMessageToGemini = async (
       // Analyze what information we have and what step we're on
       const allUserMessages = conversationHistory.filter(msg => msg.role === 'user').map(msg => msg.content).join(' ');
       const allExtracted = extractFinancialFigures(allUserMessages);
+      
+      // Check if we've been asking the same question too many times
+      const recentAssistantMessages = conversationHistory
+        .filter(msg => msg.role === 'assistant')
+        .slice(-5) // Check last 5 assistant messages
+        .map(msg => msg.content.toLowerCase());
+      
+      const hasRepeatedQuestion = recentAssistantMessages.length >= 3 && 
+        recentAssistantMessages.every(msg => 
+          msg.includes('target amount') || 
+          msg.includes('timeline') || 
+          msg.includes('income') || 
+          msg.includes('existing')
+        );
+      
+      if (hasRepeatedQuestion) {
+        console.log('ChatbotService: Detected repeated questions, moving to feasibility analysis');
+        return await performFeasibilityAnalysis(conversationHistory, allExtracted, userInfo);
+      }
       
       // Determine current step based on conversation history
       const currentStep = determineCurrentStep(conversationHistory, allExtracted);

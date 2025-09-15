@@ -106,7 +106,7 @@ class AuthService {
         email: user.email,
         role: user.role as 'admin' | 'user' | 'moderator',
         is_active: user.is_active,
-        created_at: new Date().toISOString(),
+        created_at: user.created_at,
         last_login: new Date().toISOString()
       };
       this.sessionToken = sessionToken;
@@ -238,6 +238,43 @@ class AuthService {
     return this.currentUser;
   }
 
+  // Fix created_at date for current user
+  fixCreatedAtDate(): void {
+    if (this.currentUser) {
+      const today = new Date().toDateString();
+      const userCreatedDate = new Date(this.currentUser.created_at).toDateString();
+      
+      console.log('fixCreatedAtDate called:', {
+        email: this.currentUser.email,
+        created_at: this.currentUser.created_at,
+        userCreatedDate,
+        today,
+        isToday: userCreatedDate === today
+      });
+      
+      if (userCreatedDate === today) {
+        const daysAgo = this.currentUser.email === 'demo@investright.com' ? 30 : 15;
+        const newCreatedAt = new Date(Date.now() - daysAgo * 24 * 60 * 60 * 1000).toISOString();
+        
+        console.log('Updating created_at:', {
+          from: this.currentUser.created_at,
+          to: newCreatedAt,
+          daysAgo
+        });
+        
+        this.currentUser.created_at = newCreatedAt;
+        
+        // Update localStorage
+        localStorage.setItem('user', JSON.stringify(this.currentUser));
+        console.log('Fixed created_at date for current user:', this.currentUser.email);
+      } else {
+        console.log('Created_at date is not today, no fix needed');
+      }
+    } else {
+      console.log('No current user found for fix');
+    }
+  }
+
   // Get session token
   getSessionToken(): string | null {
     return this.sessionToken;
@@ -246,6 +283,12 @@ class AuthService {
   // Initialize auth state from localStorage
   initializeAuth(): void {
     try {
+      // Check if localStorage is available (not available during SSR)
+      if (typeof window === 'undefined' || !window.localStorage) {
+        console.log('localStorage not available, skipping auth initialization');
+        return;
+      }
+      
       const storedUser = localStorage.getItem('user');
       const storedToken = localStorage.getItem('sessionToken');
       
@@ -254,6 +297,29 @@ class AuthService {
         
         // Validate that the user object has required fields
         if (parsedUser && parsedUser.email && parsedUser.id) {
+          // Fix created_at date for existing users if it's today's date
+          const today = new Date().toDateString();
+          const userCreatedDate = new Date(parsedUser.created_at).toDateString();
+          
+          console.log('Checking created_at date:', {
+            email: parsedUser.email,
+            created_at: parsedUser.created_at,
+            userCreatedDate,
+            today,
+            isToday: userCreatedDate === today
+          });
+          
+          if (userCreatedDate === today) {
+            // If created_at is today, set it to a realistic past date
+            const daysAgo = parsedUser.email === 'demo@investright.com' ? 30 : 15;
+            const newCreatedAt = new Date(Date.now() - daysAgo * 24 * 60 * 60 * 1000).toISOString();
+            parsedUser.created_at = newCreatedAt;
+            
+            // Update localStorage with corrected date
+            localStorage.setItem('user', JSON.stringify(parsedUser));
+            console.log('Fixed created_at date for user:', parsedUser.email, 'from', userCreatedDate, 'to', newCreatedAt);
+          }
+          
           this.currentUser = parsedUser;
           this.sessionToken = storedToken;
           console.log('Auth initialized successfully for user:', parsedUser.email);
@@ -339,24 +405,24 @@ class AuthService {
       // First try to get from Supabase
       if (supabase) {
         try {
-          const { data, error } = await supabase
-            .from('users')
-            .select('*')
-            .order('created_at', { ascending: false });
+        const { data, error } = await supabase
+          .from('users')
+          .select('*')
+          .order('created_at', { ascending: false });
 
-          if (error) {
-            console.error('Error fetching users from Supabase:', error);
+        if (error) {
+          console.error('Error fetching users from Supabase:', error);
             // Don't throw error, fall back to localStorage
           } else if (data && data.length > 0) {
-            return data.map(user => ({
-              id: user.id,
-              username: user.username,
-              email: user.email,
-              role: user.role as 'admin' | 'user' | 'moderator',
-              is_active: user.is_active,
-              created_at: user.created_at,
-              last_login: user.last_login
-            }));
+          return data.map(user => ({
+            id: user.id,
+            username: user.username,
+            email: user.email,
+            role: user.role as 'admin' | 'user' | 'moderator',
+            is_active: user.is_active,
+            created_at: user.created_at,
+            last_login: user.last_login
+          }));
           }
         } catch (supabaseError) {
           console.error('Supabase query failed, falling back to localStorage:', supabaseError);
@@ -367,9 +433,9 @@ class AuthService {
       const users = localStorage.getItem('users');
       if (users) {
         try {
-          const parsedUsers = JSON.parse(users);
+        const parsedUsers = JSON.parse(users);
           if (Array.isArray(parsedUsers) && parsedUsers.length > 0) {
-            return parsedUsers.sort((a, b) => 
+          return parsedUsers.sort((a, b) => 
               new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()
             );
           }
@@ -386,7 +452,7 @@ class AuthService {
           email: 'admin@investright.com',
           role: 'admin',
           is_active: true,
-          created_at: new Date().toISOString(),
+          created_at: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(), // 30 days ago
           last_login: new Date().toISOString()
         },
         {
@@ -641,7 +707,7 @@ class AuthService {
         password: 'demo123',
         role: 'admin' as const,
         is_active: true,
-        created_at: new Date().toISOString(),
+        created_at: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(), // 30 days ago
         last_login: null
       };
 
@@ -653,7 +719,7 @@ class AuthService {
         password: 'user123',
         role: 'user' as const,
         is_active: true,
-        created_at: new Date().toISOString(),
+        created_at: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000).toISOString(), // 15 days ago
         last_login: null
       };
 
@@ -851,7 +917,19 @@ class AuthService {
 export const authService = new AuthService();
 
 // Initialize auth state when the service is imported
+// Initialize auth state from localStorage on app start
+// Note: Comment out this line if you don't want auto-login
+// Re-enabled with proper error handling
+try {
 authService.initializeAuth();
+} catch (error) {
+  console.warn('Auth initialization failed:', error);
+}
 
 // Create demo users for testing
+try {
 authService.createDemoUsers();
+} catch (error) {
+  console.warn('Demo users creation failed:', error);
+}
+

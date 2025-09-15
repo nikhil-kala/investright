@@ -1,12 +1,10 @@
 import React from 'react'
-import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom'
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
 import Header from './components/Header'
 import Hero from './components/Hero'
 import Features from './components/Features'
-
 import About from './components/About'
 import Footer from './components/Footer'
-import Chatbot from './components/Chatbot'
 import Chat from './components/Chat'
 import Login from './components/Login'
 import Contact from './components/Contact'
@@ -87,14 +85,16 @@ function ChatPage() {
 
 function App() {
   console.log('App component rendering...')
+  
   return (
     <Router>
       <Routes>
         <Route path="/" element={<HomePage />} />
-        <Route path="/chat" element={<ChatPage />} />
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/signup" element={<SignupPage />} />
         <Route path="/contact" element={<ContactPage />} />
         <Route path="/our-story" element={<OurStoryPage />} />
+        <Route path="/chat" element={<ChatPage />} />
         <Route 
           path="/dashboard" 
           element={
@@ -111,7 +111,6 @@ function App() {
             </ProtectedRoute>
           } 
         />
-        <Route path="/signup" element={<SignupPage />} />
       </Routes>
     </Router>
   )

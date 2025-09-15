@@ -148,7 +148,9 @@ RETURNS TABLE (
   username VARCHAR,
   email VARCHAR,
   role VARCHAR,
-  is_active BOOLEAN
+  is_active BOOLEAN,
+  created_at TIMESTAMP WITH TIME ZONE,
+  last_login TIMESTAMP WITH TIME ZONE
 ) AS $$
 BEGIN
   RETURN QUERY
@@ -157,7 +159,9 @@ BEGIN
     u.username,
     u.email,
     u.role,
-    u.is_active
+    u.is_active,
+    u.created_at,
+    u.last_login
   FROM users u
   WHERE u.email = user_email 
     AND u.password_hash = hash_password(user_password)

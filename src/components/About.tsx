@@ -258,15 +258,11 @@ export default function About() {
             </div>
 
             <div className="flex flex-col sm:flex-row gap-4">
-              <button className="bg-blue-600 text-white px-8 py-3 rounded-lg hover:bg-blue-700 transition-colors font-semibold">
-                {t.about.startJourney}
-              </button>
               <button 
                 onClick={() => navigate('/chat')}
-                className="bg-green-600 text-white px-8 py-3 rounded-lg hover:bg-green-700 transition-colors font-semibold flex items-center gap-2"
+                className="bg-blue-600 text-white px-8 py-3 rounded-lg hover:bg-blue-700 transition-colors font-semibold"
               >
-                <MessageCircle className="h-5 w-5" />
-                Start Chatting
+                {t.about.startJourney}
               </button>
             </div>
           </div>
