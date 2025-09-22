@@ -13,10 +13,11 @@ import Dashboard from './components/Dashboard'
 import ProtectedRoute from './components/ProtectedRoute'
 import Profile from './components/Profile'
 import Signup from './components/Signup'
+import CreditCards from './components/CreditCards'
+import Settings from './components/Settings'
+import DiagnosticPage from './components/DiagnosticPage'
 
 function HomePage() {
-  console.log('HomePage component rendering...')
-  
   return (
     <div className="min-h-screen bg-white">
       <Header />
@@ -29,7 +30,6 @@ function HomePage() {
 }
 
 function LoginPage() {
-  console.log('LoginPage component rendering...')
   return (
     <div className="min-h-screen bg-white">
       <Header />
@@ -40,7 +40,6 @@ function LoginPage() {
 }
 
 function ContactPage() {
-  console.log('ContactPage component rendering...')
   return (
     <div className="min-h-screen bg-white">
       <Header />
@@ -51,7 +50,6 @@ function ContactPage() {
 }
 
 function OurStoryPage() {
-  console.log('OurStoryPage component rendering...')
   return (
     <div className="min-h-screen bg-white">
       <Header />
@@ -62,7 +60,6 @@ function OurStoryPage() {
 }
 
 function SignupPage() {
-  console.log('SignupPage component rendering...')
   return (
     <div className="min-h-screen bg-white">
       <Header />
@@ -73,7 +70,6 @@ function SignupPage() {
 }
 
 function ChatPage() {
-  console.log('ChatPage component rendering...')
   return (
     <div className="min-h-screen bg-white">
       <Header />
@@ -84,8 +80,6 @@ function ChatPage() {
 }
 
 function App() {
-  console.log('App component rendering...')
-  
   return (
     <Router>
       <Routes>
@@ -95,6 +89,7 @@ function App() {
         <Route path="/contact" element={<ContactPage />} />
         <Route path="/our-story" element={<OurStoryPage />} />
         <Route path="/chat" element={<ChatPage />} />
+        <Route path="/diagnostic" element={<DiagnosticPage />} />
         <Route 
           path="/dashboard" 
           element={
@@ -108,6 +103,22 @@ function App() {
           element={
             <ProtectedRoute>
               <Profile />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/credit-cards" 
+          element={
+            <ProtectedRoute>
+              <CreditCards />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/settings" 
+          element={
+            <ProtectedRoute>
+              <Settings />
             </ProtectedRoute>
           } 
         />

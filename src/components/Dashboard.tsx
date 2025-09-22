@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { User, LogOut, Settings, BarChart3, Users, Shield, Activity, TrendingUp, MessageCircle, Clock, Bot, X, RefreshCcw } from 'lucide-react';
 import { useLanguage } from '../hooks/useLanguage';
 import { authService, User as UserType } from '../services/authService';
+
 import { chatService } from '../services/chatService';
 import CardManagerWithWebSearch from './CardManagerWithWebSearch';
 
@@ -86,8 +87,10 @@ const getFirstName = (username: string): string => {
 const formatDisplayName = (username: string): string => {
   if (!username) return 'Unknown User';
   const parts = username.split('.');
-  if (parts.length >= 2) {
-    return `${parts[0].charAt(0).toUpperCase() + parts[0].slice(1)} ${parts[1].charAt(0).toUpperCase() + parts[1].slice(1)}`;
+  if (parts.length >= 2 && parts[0] && parts[1]) {
+    const firstName = parts[0];
+    const lastName = parts[1];
+    return `${firstName.charAt(0).toUpperCase() + firstName.slice(1)} ${lastName.charAt(0).toUpperCase() + lastName.slice(1)}`;
   }
   return username.charAt(0).toUpperCase() + username.slice(1);
 };

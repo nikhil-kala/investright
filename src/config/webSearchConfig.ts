@@ -10,8 +10,8 @@ export interface WebSearchConfig {
 
 // Google Custom Search API Configuration
 export const GOOGLE_SEARCH_CONFIG: WebSearchConfig = {
-  apiKey: process.env.REACT_APP_GOOGLE_SEARCH_API_KEY || '',
-  searchEngineId: process.env.REACT_APP_GOOGLE_SEARCH_ENGINE_ID || '',
+  apiKey: import.meta.env.VITE_GOOGLE_SEARCH_API_KEY || '',
+  searchEngineId: import.meta.env.VITE_GOOGLE_SEARCH_ENGINE_ID || '',
   baseUrl: 'https://www.googleapis.com/customsearch/v1',
   maxResults: 10,
   timeout: 10000
@@ -19,7 +19,7 @@ export const GOOGLE_SEARCH_CONFIG: WebSearchConfig = {
 
 // Bing Search API Configuration (Alternative)
 export const BING_SEARCH_CONFIG: WebSearchConfig = {
-  apiKey: process.env.REACT_APP_BING_SEARCH_API_KEY || '',
+  apiKey: import.meta.env.VITE_BING_SEARCH_API_KEY || '',
   searchEngineId: '',
   baseUrl: 'https://api.bing.microsoft.com/v7.0/search',
   maxResults: 10,

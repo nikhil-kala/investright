@@ -1,5 +1,1098 @@
 // Expert Financial Advisor Chatbot Service for InvestRight
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { webSearchService } from './webSearchService';
+
+// Interface to track goal details for progressive questioning
+interface GoalDetails {
+  goalType: string;
+  city?: string;
+  propertyType?: string;
+  propertySize?: string;
+  areaPreference?: string;
+  carBrand?: string;
+  carType?: string;
+  carVariant?: string;
+  courseType?: string;
+  institutionType?: string;
+  courseLevel?: string;
+  specificInstitution?: string;
+}
+
+// Function to extract goal details from conversation history
+const extractGoalDetails = (conversationHistory: Array<{ role: 'user' | 'assistant', content: string }>): GoalDetails => {
+  const allUserMessages = conversationHistory
+    .filter(msg => msg.role === 'user')
+    .map(msg => msg.content.toLowerCase())
+    .join(' ');
+
+  const details: GoalDetails = { goalType: 'unknown' };
+
+  // Determine goal type
+  if (allUserMessages.includes('house') || allUserMessages.includes('home') || allUserMessages.includes('property')) {
+    details.goalType = 'property';
+    
+    // Extract property details
+    if (allUserMessages.includes('mumbai')) details.city = 'mumbai';
+    else if (allUserMessages.includes('delhi')) details.city = 'delhi';
+    else if (allUserMessages.includes('bangalore') || allUserMessages.includes('bengaluru')) details.city = 'bangalore';
+    else if (allUserMessages.includes('pune')) details.city = 'pune';
+    else if (allUserMessages.includes('hyderabad')) details.city = 'hyderabad';
+    else if (allUserMessages.includes('chennai')) details.city = 'chennai';
+    else if (allUserMessages.includes('kolkata')) details.city = 'kolkata';
+    else if (allUserMessages.includes('ahmedabad')) details.city = 'ahmedabad';
+    else if (allUserMessages.includes('gurgaon') || allUserMessages.includes('gurugram')) details.city = 'gurgaon';
+    else if (allUserMessages.includes('noida')) details.city = 'noida';
+
+    if (allUserMessages.includes('2 bhk') || allUserMessages.includes('2bhk') || allUserMessages.includes('two bedroom')) details.propertySize = '2bhk';
+    else if (allUserMessages.includes('3 bhk') || allUserMessages.includes('3bhk') || allUserMessages.includes('three bedroom')) details.propertySize = '3bhk';
+    else if (allUserMessages.includes('1 bhk') || allUserMessages.includes('1bhk') || allUserMessages.includes('one bedroom')) details.propertySize = '1bhk';
+    else if (allUserMessages.includes('4 bhk') || allUserMessages.includes('4bhk') || allUserMessages.includes('four bedroom')) details.propertySize = '4bhk';
+
+    if (allUserMessages.includes('apartment') || allUserMessages.includes('flat')) details.propertyType = 'apartment';
+    else if (allUserMessages.includes('villa') || allUserMessages.includes('independent house') || allUserMessages.includes('bungalow')) details.propertyType = 'independent';
+
+    if (allUserMessages.includes('prime location') || allUserMessages.includes('city center') || allUserMessages.includes('central')) details.areaPreference = 'prime';
+    else if (allUserMessages.includes('suburb') || allUserMessages.includes('outskirts') || allUserMessages.includes('affordable area')) details.areaPreference = 'suburb';
+  }
+  
+  else if (allUserMessages.includes('car') || allUserMessages.includes('vehicle')) {
+    details.goalType = 'car';
+    
+    // Extract car details
+    if (allUserMessages.includes('bmw')) details.carBrand = 'bmw';
+    else if (allUserMessages.includes('audi')) details.carBrand = 'audi';
+    else if (allUserMessages.includes('mercedes')) details.carBrand = 'mercedes';
+    else if (allUserMessages.includes('honda')) details.carBrand = 'honda';
+    else if (allUserMessages.includes('toyota')) details.carBrand = 'toyota';
+    else if (allUserMessages.includes('hyundai')) details.carBrand = 'hyundai';
+    else if (allUserMessages.includes('maruti')) details.carBrand = 'maruti';
+    else if (allUserMessages.includes('tata')) details.carBrand = 'tata';
+    else if (allUserMessages.includes('mahindra')) details.carBrand = 'mahindra';
+    else if (allUserMessages.includes('kia')) details.carBrand = 'kia';
+
+    if (allUserMessages.includes('sedan')) details.carType = 'sedan';
+    else if (allUserMessages.includes('suv')) details.carType = 'suv';
+    else if (allUserMessages.includes('hatchback')) details.carType = 'hatchback';
+    else if (allUserMessages.includes('compact')) details.carType = 'compact';
+
+    if (allUserMessages.includes('petrol') || allUserMessages.includes('gasoline')) details.carVariant = 'petrol';
+    else if (allUserMessages.includes('diesel')) details.carVariant = 'diesel';
+    else if (allUserMessages.includes('electric') || allUserMessages.includes('ev')) details.carVariant = 'electric';
+    else if (allUserMessages.includes('hybrid')) details.carVariant = 'hybrid';
+  }
+  
+  else if (allUserMessages.includes('education') || allUserMessages.includes('college') || allUserMessages.includes('course') || allUserMessages.includes('study')) {
+    details.goalType = 'education';
+    
+    // Extract education details
+    if (allUserMessages.includes('engineering')) details.courseType = 'engineering';
+    else if (allUserMessages.includes('medical') || allUserMessages.includes('mbbs')) details.courseType = 'medical';
+    else if (allUserMessages.includes('mba') || allUserMessages.includes('management')) details.courseType = 'mba';
+    else if (allUserMessages.includes('law')) details.courseType = 'law';
+    else if (allUserMessages.includes('bca') || allUserMessages.includes('computer science')) details.courseType = 'computer';
+    else if (allUserMessages.includes('commerce') || allUserMessages.includes('bcom')) details.courseType = 'commerce';
+
+    if (allUserMessages.includes('government') || allUserMessages.includes('public')) details.institutionType = 'government';
+    else if (allUserMessages.includes('private')) details.institutionType = 'private';
+    else if (allUserMessages.includes('international') || allUserMessages.includes('abroad')) details.institutionType = 'international';
+
+    if (allUserMessages.includes('bachelor') || allUserMessages.includes('graduation') || allUserMessages.includes('undergraduate')) details.courseLevel = 'bachelor';
+    else if (allUserMessages.includes('master') || allUserMessages.includes('postgraduate') || allUserMessages.includes('pg')) details.courseLevel = 'master';
+    else if (allUserMessages.includes('diploma')) details.courseLevel = 'diploma';
+
+    if (allUserMessages.includes('iit')) details.specificInstitution = 'iit';
+    else if (allUserMessages.includes('nit')) details.specificInstitution = 'nit';
+    else if (allUserMessages.includes('iim')) details.specificInstitution = 'iim';
+    else if (allUserMessages.includes('aiims')) details.specificInstitution = 'aiims';
+  }
+
+  return details;
+};
+
+// Progressive questioning system for comprehensive goal details
+const getNextProgressiveQuestion = (details: GoalDetails, conversationHistory: Array<{ role: 'user' | 'assistant', content: string }>): string | null => {
+  
+  // Property questioning sequence
+  if (details.goalType === 'property') {
+    if (!details.city) {
+      return "Great! To give you accurate property pricing, could you tell me which city or region you're considering?\n\n**Sample format:**\n• \"Mumbai, preferably Andheri area\"\n• \"Bangalore, near IT corridor\"\n• \"Pune, any good locality\"\n• \"Delhi, metro connectivity important\"";
+    }
+    
+    if (!details.propertySize) {
+      return "Perfect! Now, what size property are you looking for?\n\n**Sample format:**\n• \"2 BHK apartment\"\n• \"3 BHK with balcony\"\n• \"1 BHK for investment\"\n• \"4 BHK independent house\"";
+    }
+    
+    if (!details.propertyType) {
+      return "Got it! What type of property would you prefer?\n\n**Sample format:**\n• \"Apartment in a complex\"\n• \"Independent house/villa\"\n• \"Row house\"\n• \"Builder floor\"";
+    }
+    
+    if (!details.areaPreference) {
+      const cityName = details.city?.charAt(0).toUpperCase() + details.city?.slice(1);
+      return `Almost there! In ${cityName}, do you have any specific area preferences?\n\n**Sample format:**\n• \"Prime location, close to city center\"\n• \"Suburban area, more space for budget\"\n• \"Near metro/transport hubs\"\n• \"Specific locality: [area name]\"`;
+    }
+  }
+  
+  // Car questioning sequence
+  else if (details.goalType === 'car') {
+    if (!details.carBrand) {
+      return "Excellent! To provide accurate car pricing, do you have any brand preferences?\n\n**Sample format:**\n• \"BMW or Audi, luxury segment\"\n• \"Honda or Toyota, reliable brands\"\n• \"Maruti or Hyundai, budget-friendly\"\n• \"Any good brand, no specific preference\"";
+    }
+    
+    if (!details.carType) {
+      return "Great choice! What type of car are you looking for?\n\n**Sample format:**\n• \"SUV for family trips\"\n• \"Sedan for city driving\"\n• \"Hatchback, compact size\"\n• \"Compact SUV\"";
+    }
+    
+    if (!details.carVariant) {
+      return "Perfect! Any preference for fuel type or specific features?\n\n**Sample format:**\n• \"Petrol, city driving mainly\"\n• \"Diesel, long distance travel\"\n• \"Electric, eco-friendly option\"\n• \"Automatic transmission preferred\"";
+    }
+  }
+  
+  // Education questioning sequence
+  else if (details.goalType === 'education') {
+    if (!details.courseType) {
+      return "Wonderful! What type of course or field of study are you planning for?\n\n**Sample format:**\n• \"Engineering, computer science\"\n• \"Medical, MBBS\"\n• \"MBA, management studies\"\n• \"Law, legal studies\"\n• \"Commerce, CA preparation\"";
+    }
+    
+    if (!details.institutionType) {
+      return "Great! Do you have a preference for the type of institution?\n\n**Sample format:**\n• \"Government colleges, affordable fees\"\n• \"Private institutions, good facilities\"\n• \"International universities, abroad\"\n• \"Both government and private options\"";
+    }
+    
+    if (!details.courseLevel) {
+      return "Perfect! What level of education are you planning?\n\n**Sample format:**\n• \"Bachelor's degree, undergraduate\"\n• \"Master's degree, postgraduate\"\n• \"Diploma course\"\n• \"Professional certification\"";
+    }
+    
+    if (!details.specificInstitution && details.institutionType === 'government') {
+      return "Excellent! Any specific institutions you're targeting?\n\n**Sample format:**\n• \"IIT for engineering\"\n• \"NIT, good government option\"\n• \"IIM for MBA\"\n• \"AIIMS for medical\"\n• \"Any good government college\"";
+    }
+  }
+  
+  return null; // No more questions needed
+};
+
+// Enhanced function to intelligently understand and process user responses
+const intelligentResponseProcessor = (userResponse: string, conversationHistory: Array<{ role: 'user' | 'assistant', content: string }>): string => {
+  const response = userResponse.toLowerCase().trim();
+  
+  // Get the last assistant question to understand context
+  const lastAssistantMessage = conversationHistory
+    .filter(msg => msg.role === 'assistant')
+    .slice(-1)[0]?.content || '';
+  
+  // Analyze what the assistant was asking about
+  const questionContext = analyzeQuestionContext(lastAssistantMessage);
+  
+  // Process the user's response based on the context
+  const processedInfo = processUserResponseInContext(response, questionContext, conversationHistory);
+  
+  // Update goal details with the new information
+  const updatedDetails = extractGoalDetails([...conversationHistory, { role: 'user', content: userResponse }]);
+  
+  // Enhanced with processed information
+  const enhancedDetails = mergeProcessedInformation(updatedDetails, processedInfo);
+  
+  // Determine next step
+  const nextQuestion = getNextProgressiveQuestion(enhancedDetails, conversationHistory);
+  
+  if (nextQuestion) {
+    // Generate dynamic acknowledgment
+    const acknowledgment = generateDynamicAcknowledgment(processedInfo, questionContext);
+    return `${acknowledgment} ${nextQuestion}`;
+  }
+  
+  // We have enough details about the goal specifics, but check if we need to progress to income/savings collection
+  
+  // Extract financial figures from the entire conversation to see what we have
+  const allUserMessages = conversationHistory.filter(msg => msg.role === 'user').map(msg => msg.content).join(' ');
+  const extractedFigures = extractFinancialFigures(allUserMessages, 'general');
+  
+  console.log('intelligentResponseProcessor: Checking progression needs', {
+    extractedFigures,
+    enhancedDetails
+  });
+  
+  // If we have goal details but missing financial info, progress to next step instead of providing pricing
+  if (extractedFigures.amount && extractedFigures.timeline && !extractedFigures.income) {
+    return "Perfect! Now I have a clear understanding of your goal. To create a comprehensive financial plan, I need to understand your financial capacity.\n\n**What is your current monthly income and how much can you invest monthly towards this goal?**\n\n**Sample format:**\n• \"₹50,000 per month, can invest ₹20,000\"\n• \"I earn ₹8 LPA, can save ₹30,000 monthly\"\n• \"Monthly income ₹1.2 lakhs, investment capacity ₹40,000\"";
+  }
+  
+  if (extractedFigures.amount && extractedFigures.timeline && extractedFigures.income && !extractedFigures.existingSavings) {
+    return "Excellent! I have your income and investment capacity. One more important detail:\n\n**Do you have any existing savings or investments that we can consider for this goal?**\n\n**Sample format:**\n• \"I have ₹2 lakhs in FDs\"\n• \"₹5 lakhs in mutual funds already\"\n• \"No existing savings, starting fresh\"";
+  }
+  
+  // If we have all required info, proceed to feasibility analysis
+  if (extractedFigures.amount && extractedFigures.timeline && extractedFigures.income) {
+    return "Thank you for all the details! Let me now perform a comprehensive feasibility analysis for your goal. I'll calculate if your target is achievable with your current capacity and provide you with a detailed investment strategy.\n\n*Analyzing your financial plan...*";
+  }
+  
+  // Fallback to comprehensive pricing if we're still in goal details phase
+  return generateComprehensivePricing(enhancedDetails, conversationHistory);
+};
+
+// Function to analyze what the assistant was asking about in the last message
+const analyzeQuestionContext = (lastAssistantMessage: string): string => {
+  const message = lastAssistantMessage.toLowerCase();
+  
+  if (message.includes('which city') || message.includes('city or area') || message.includes('region')) {
+    return 'city';
+  } else if (message.includes('size property') || message.includes('bhk') || message.includes('bedroom')) {
+    return 'property_size';
+  } else if (message.includes('type of property') || message.includes('apartment') || message.includes('independent')) {
+    return 'property_type';
+  } else if (message.includes('area preferences') || message.includes('specific area')) {
+    return 'area_preference';
+  } else if (message.includes('brand preferences') || message.includes('brand')) {
+    return 'car_brand';
+  } else if (message.includes('type of car') || message.includes('hatchback') || message.includes('sedan')) {
+    return 'car_type';
+  } else if (message.includes('fuel type') || message.includes('petrol') || message.includes('diesel')) {
+    return 'car_fuel';
+  } else if (message.includes('course or field') || message.includes('type of course')) {
+    return 'course_type';
+  } else if (message.includes('type of institution') || message.includes('government') || message.includes('private')) {
+    return 'institution_type';
+  } else if (message.includes('level of education') || message.includes('bachelor') || message.includes('master')) {
+    return 'course_level';
+  } else if (message.includes('specific institutions') || message.includes('colleges')) {
+    return 'specific_institution';
+  } else if (message.includes('monthly income') || message.includes('current income') || message.includes('invest monthly') || message.includes('lpa')) {
+    return 'income_and_investment';
+  } else if (message.includes('existing savings') || message.includes('investments') || message.includes('fd') || message.includes('mutual fund')) {
+    return 'existing_savings';
+  } else {
+    return 'general';
+  }
+};
+
+// Function to process user response based on the context of what was asked
+const processUserResponseInContext = (response: string, questionContext: string, _conversationHistory: Array<{ role: 'user' | 'assistant', content: string }>): any => {
+  let processedInfo: any = {};
+  
+  switch (questionContext) {
+    case 'city':
+      processedInfo.city = extractCityFromResponse(response);
+      break;
+    case 'property_size':
+      processedInfo.propertySize = extractPropertySizeFromResponse(response);
+      break;
+    case 'property_type':
+      processedInfo.propertyType = extractPropertyTypeFromResponse(response);
+      break;
+    case 'area_preference':
+      processedInfo.areaPreference = extractAreaPreferenceFromResponse(response);
+      break;
+    case 'car_brand':
+      processedInfo.carBrand = extractCarBrandFromResponse(response);
+      break;
+    case 'car_type':
+      processedInfo.carType = extractCarTypeFromResponse(response);
+      break;
+    case 'car_fuel':
+      processedInfo.carVariant = extractCarFuelFromResponse(response);
+      break;
+    case 'course_type':
+      processedInfo.courseType = extractCourseTypeFromResponse(response);
+      break;
+    case 'institution_type':
+      processedInfo.institutionType = extractInstitutionTypeFromResponse(response);
+      break;
+    case 'course_level':
+      processedInfo.courseLevel = extractCourseLevelFromResponse(response);
+      break;
+    case 'specific_institution':
+      processedInfo.specificInstitution = extractSpecificInstitutionFromResponse(response);
+      break;
+    case 'income_and_investment':
+      processedInfo.income = extractIncomeFromResponse(response);
+      processedInfo.monthlyInvestment = extractMonthlyInvestmentFromResponse(response);
+      break;
+    case 'existing_savings':
+      processedInfo.existingSavings = extractExistingSavingsFromResponse(response);
+      break;
+    default:
+      // Try to extract any relevant information
+      processedInfo = extractGeneralInformation(response);
+  }
+  
+  return processedInfo;
+};
+
+// Helper functions for intelligent natural language understanding
+
+const extractCityFromResponse = (response: string): string | undefined => {
+  const cityMappings = {
+    'mumbai': ['mumbai', 'bombay', 'andheri', 'bandra', 'powai', 'thane', 'navi mumbai'],
+    'delhi': ['delhi', 'new delhi', 'ncr', 'dwarka', 'rohini', 'gurgaon', 'gurugram', 'noida'],
+    'bangalore': ['bangalore', 'bengaluru', 'whitefield', 'koramangala', 'indiranagar', 'electronic city'],
+    'pune': ['pune', 'pimpri', 'chinchwad', 'hinjewadi', 'magarpatta', 'aundh', 'kharadi'],
+    'hyderabad': ['hyderabad', 'secunderabad', 'hitec city', 'gachibowli', 'madhapur'],
+    'chennai': ['chennai', 'madras', 'anna nagar', 'velachery', 'tambaram', 'omr']
+  };
+
+  for (const [city, keywords] of Object.entries(cityMappings)) {
+    if (keywords.some(keyword => response.includes(keyword))) {
+      return city;
+    }
+  }
+  return response.includes('anywhere') || response.includes('flexible') ? 'flexible' : undefined;
+};
+
+const extractPropertySizeFromResponse = (response: string): string | undefined => {
+  if (response.includes('1') || response.includes('one') || response.includes('studio')) return '1bhk';
+  if (response.includes('2') || response.includes('two')) return '2bhk';
+  if (response.includes('3') || response.includes('three')) return '3bhk';
+  if (response.includes('4') || response.includes('four') || response.includes('big')) return '4bhk';
+  if (response.includes('small')) return '1bhk';
+  if (response.includes('medium')) return '2bhk';
+  if (response.includes('large')) return '3bhk';
+  return undefined;
+};
+
+const extractPropertyTypeFromResponse = (response: string): string | undefined => {
+  if (response.includes('apartment') || response.includes('flat') || response.includes('complex')) return 'apartment';
+  if (response.includes('independent') || response.includes('house') || response.includes('villa')) return 'independent';
+  if (response.includes('both') || response.includes('any')) return 'flexible';
+  return undefined;
+};
+
+const extractAreaPreferenceFromResponse = (response: string): string | undefined => {
+  if (response.includes('prime') || response.includes('central') || response.includes('main area')) return 'prime';
+  if (response.includes('suburb') || response.includes('outskirts') || response.includes('affordable')) return 'suburb';
+  if (response.includes('metro') || response.includes('transport')) return 'transport_hub';
+  if (response.includes('it') || response.includes('tech')) return 'it_area';
+  if (response.includes('anywhere') || response.includes('flexible')) return 'flexible';
+  return undefined;
+};
+
+const extractCarBrandFromResponse = (response: string): string | undefined => {
+  const brands = ['bmw', 'audi', 'mercedes', 'honda', 'toyota', 'hyundai', 'maruti', 'tata'];
+  for (const brand of brands) {
+    if (response.includes(brand)) return brand;
+  }
+  if (response.includes('luxury') || response.includes('premium')) return 'luxury';
+  if (response.includes('budget') || response.includes('affordable')) return 'budget';
+  if (response.includes('any') || response.includes('flexible')) return 'flexible';
+  return undefined;
+};
+
+const extractCarTypeFromResponse = (response: string): string | undefined => {
+  if (response.includes('suv') || response.includes('big car') || response.includes('family')) return 'suv';
+  if (response.includes('sedan') || response.includes('comfortable')) return 'sedan';
+  if (response.includes('hatchback') || response.includes('small') || response.includes('compact')) return 'hatchback';
+  return undefined;
+};
+
+const extractCarFuelFromResponse = (response: string): string | undefined => {
+  if (response.includes('petrol') || response.includes('gas')) return 'petrol';
+  if (response.includes('diesel') || response.includes('mileage')) return 'diesel';
+  if (response.includes('electric') || response.includes('ev')) return 'electric';
+  if (response.includes('hybrid')) return 'hybrid';
+  return undefined;
+};
+
+const extractCourseTypeFromResponse = (response: string): string | undefined => {
+  if (response.includes('engineering') || response.includes('computer')) return 'engineering';
+  if (response.includes('medical') || response.includes('doctor')) return 'medical';
+  if (response.includes('mba') || response.includes('management')) return 'mba';
+  if (response.includes('law') || response.includes('legal')) return 'law';
+  if (response.includes('commerce') || response.includes('ca')) return 'commerce';
+  return undefined;
+};
+
+const extractInstitutionTypeFromResponse = (response: string): string | undefined => {
+  if (response.includes('government') || response.includes('affordable')) return 'government';
+  if (response.includes('private') || response.includes('facilities')) return 'private';
+  if (response.includes('international') || response.includes('abroad')) return 'international';
+  if (response.includes('both') || response.includes('any')) return 'flexible';
+  return undefined;
+};
+
+const extractCourseLevelFromResponse = (response: string): string | undefined => {
+  if (response.includes('bachelor') || response.includes('graduation')) return 'bachelor';
+  if (response.includes('master') || response.includes('postgraduate')) return 'master';
+  if (response.includes('diploma')) return 'diploma';
+  return undefined;
+};
+
+const extractSpecificInstitutionFromResponse = (response: string): string | undefined => {
+  if (response.includes('iit')) return 'iit';
+  if (response.includes('nit')) return 'nit';
+  if (response.includes('iim')) return 'iim';
+  if (response.includes('aiims')) return 'aiims';
+  if (response.includes('any good') || response.includes('best')) return 'top_tier';
+  return undefined;
+};
+
+const extractIncomeFromResponse = (response: string): number | undefined => {
+  const figures = extractFinancialFigures(response, 'income');
+  return figures.income;
+};
+
+const extractMonthlyInvestmentFromResponse = (response: string): number | undefined => {
+  const figures = extractFinancialFigures(response, 'general');
+  return figures.monthlyInvestment;
+};
+
+const extractExistingSavingsFromResponse = (response: string): number | undefined => {
+  const figures = extractFinancialFigures(response, 'general');
+  return figures.existingSavings;
+};
+
+const extractGeneralInformation = (response: string): any => {
+  return {
+    city: extractCityFromResponse(response),
+    propertySize: extractPropertySizeFromResponse(response),
+    propertyType: extractPropertyTypeFromResponse(response),
+    carBrand: extractCarBrandFromResponse(response),
+    carType: extractCarTypeFromResponse(response),
+    income: extractIncomeFromResponse(response),
+    monthlyInvestment: extractMonthlyInvestmentFromResponse(response),
+    existingSavings: extractExistingSavingsFromResponse(response)
+  };
+};
+
+const mergeProcessedInformation = (existingDetails: GoalDetails, processedInfo: any): GoalDetails => {
+  const merged = { ...existingDetails };
+  if (processedInfo.city) merged.city = processedInfo.city;
+  if (processedInfo.propertySize) merged.propertySize = processedInfo.propertySize;
+  if (processedInfo.propertyType) merged.propertyType = processedInfo.propertyType;
+  if (processedInfo.areaPreference) merged.areaPreference = processedInfo.areaPreference;
+  if (processedInfo.carBrand) merged.carBrand = processedInfo.carBrand;
+  if (processedInfo.carType) merged.carType = processedInfo.carType;
+  if (processedInfo.carVariant) merged.carVariant = processedInfo.carVariant;
+  if (processedInfo.courseType) merged.courseType = processedInfo.courseType;
+  if (processedInfo.institutionType) merged.institutionType = processedInfo.institutionType;
+  if (processedInfo.courseLevel) merged.courseLevel = processedInfo.courseLevel;
+  if (processedInfo.specificInstitution) merged.specificInstitution = processedInfo.specificInstitution;
+  return merged;
+};
+
+const generateDynamicAcknowledgment = (processedInfo: any, questionContext: string): string => {
+  const acknowledgments = {
+    city: processedInfo.city ? `Great choice! ${processedInfo.city.charAt(0).toUpperCase() + processedInfo.city.slice(1)} is a wonderful location.` : "Thank you for that information!",
+    property_size: processedInfo.propertySize ? `Perfect! A ${processedInfo.propertySize.toUpperCase()} is a great size choice.` : "Got it!",
+    property_type: processedInfo.propertyType ? `Excellent! ${processedInfo.propertyType === 'apartment' ? 'Apartments' : 'Independent houses'} have their advantages.` : "Understood!",
+    car_brand: processedInfo.carBrand ? `Great preference! ${processedInfo.carBrand.charAt(0).toUpperCase() + processedInfo.carBrand.slice(1)} makes reliable vehicles.` : "Noted!",
+    car_type: processedInfo.carType ? `Excellent! ${processedInfo.carType.toUpperCase()}s are very popular.` : "Perfect!",
+    course_type: processedInfo.courseType ? `Wonderful field! ${processedInfo.courseType.charAt(0).toUpperCase() + processedInfo.courseType.slice(1)} has great prospects.` : "Great choice!",
+    income_and_investment: processedInfo.income ? `Excellent! With your financial capacity, we can create a strong investment plan.` : "Thank you for sharing your financial details!",
+    existing_savings: processedInfo.existingSavings ? `Great! Your existing savings will give us a good head start.` : "Perfect! Starting fresh is completely fine.",
+    default: "Thank you for that information!"
+  };
+  return acknowledgments[questionContext] || acknowledgments.default;
+};
+
+// Function to process follow-up details when user provides specific information
+const processFollowUpDetails = (userResponse: string, conversationHistory: Array<{ role: 'user' | 'assistant', content: string }>): string => {
+  return intelligentResponseProcessor(userResponse, conversationHistory);
+};
+
+// Function to generate comprehensive pricing based on all collected details
+const generateComprehensivePricing = (details: GoalDetails, conversationHistory: Array<{ role: 'user' | 'assistant', content: string }>): string => {
+  
+  if (details.goalType === 'property') {
+    return generatePropertyPricing(details);
+  } else if (details.goalType === 'car') {
+    return generateCarPricing(details);
+  } else if (details.goalType === 'education') {
+    return generateEducationPricing(details);
+  } else {
+    return "Thank you for all the details! Based on the information you've provided, I can help you create a realistic budget estimate. What target amount feels comfortable for your goal, and what timeline are you considering?";
+  }
+};
+
+// Generate detailed property pricing
+const generatePropertyPricing = (details: GoalDetails): string => {
+  const cityName = details.city?.charAt(0).toUpperCase() + details.city?.slice(1);
+  const propertyTypeText = details.propertyType === 'independent' ? 'Independent House/Villa' : 'Apartment';
+  const sizeText = details.propertySize?.toUpperCase() || 'Property';
+  const areaText = details.areaPreference === 'prime' ? 'Prime Location' : details.areaPreference === 'suburb' ? 'Suburban Area' : 'Good Locality';
+
+  let priceRange = '';
+  let specificEstimate = '';
+
+  // City-based pricing
+  if (details.city === 'mumbai' || details.city === 'delhi' || details.city === 'bangalore') {
+    if (details.propertySize === '2bhk') {
+      priceRange = '₹80 lakhs - ₹1.5 crores';
+      specificEstimate = '₹1.1 crores';
+    } else if (details.propertySize === '3bhk') {
+      priceRange = '₹1.2 crores - ₹2.5 crores';
+      specificEstimate = '₹1.8 crores';
+    } else {
+      priceRange = '₹80 lakhs - ₹2.5 crores';
+      specificEstimate = '₹1.3 crores';
+    }
+  } else if (details.city === 'pune' || details.city === 'hyderabad' || details.city === 'chennai') {
+    if (details.propertySize === '2bhk') {
+      priceRange = '₹50 lakhs - ₹80 lakhs';
+      specificEstimate = '₹65 lakhs';
+    } else if (details.propertySize === '3bhk') {
+      priceRange = '₹70 lakhs - ₹1.2 crores';
+      specificEstimate = '₹90 lakhs';
+    } else {
+      priceRange = '₹50 lakhs - ₹1.2 crores';
+      specificEstimate = '₹75 lakhs';
+    }
+  } else {
+    if (details.propertySize === '2bhk') {
+      priceRange = '₹30 lakhs - ₹60 lakhs';
+      specificEstimate = '₹45 lakhs';
+    } else if (details.propertySize === '3bhk') {
+      priceRange = '₹40 lakhs - ₹80 lakhs';
+      specificEstimate = '₹60 lakhs';
+    } else {
+      priceRange = '₹30 lakhs - ₹80 lakhs';
+      specificEstimate = '₹50 lakhs';
+    }
+  }
+
+  // Adjust for area preference
+  if (details.areaPreference === 'prime') {
+    specificEstimate = specificEstimate.replace('₹', '₹1.2-1.4x of ');
+  } else if (details.areaPreference === 'suburb') {
+    specificEstimate = specificEstimate.replace('₹', '₹0.8-0.9x of ');
+  }
+
+  return `Perfect! Based on all the details you've provided, here's a comprehensive pricing analysis:
+
+**🏠 Your Property Requirements:**
+• **Location**: ${cityName} (${areaText})
+• **Type**: ${propertyTypeText}
+• **Size**: ${sizeText}
+
+**💰 Pricing Analysis:**
+• **Market Range**: ${priceRange}
+• **Recommended Target**: **${specificEstimate}**
+
+**📊 Price Breakdown:**
+• Base property cost: 90% of budget
+• Registration & legal: 8-10% additional
+• Interior/furnishing: 15-20% additional
+
+**🎯 Suggested Planning Amount: ${specificEstimate}**
+
+This covers the property purchase with all associated costs. 
+
+**Next Step:** What timeline are you considering for this purchase? This will help me create your investment strategy.`;
+};
+
+// Generate detailed car pricing
+const generateCarPricing = (details: GoalDetails): string => {
+  const brandText = details.carBrand?.toUpperCase() || 'Car';
+  const typeText = details.carType?.toUpperCase() || '';
+  const variantText = details.carVariant?.toUpperCase() || '';
+
+  let priceRange = '';
+  let specificEstimate = '';
+  let models = '';
+
+  // Brand and type-based pricing
+  if (details.carBrand === 'bmw' || details.carBrand === 'audi' || details.carBrand === 'mercedes') {
+    if (details.carType === 'sedan') {
+      priceRange = '₹42-60 lakhs';
+      specificEstimate = '₹50 lakhs';
+      models = `${brandText} 3 Series/A4/C-Class`;
+    } else if (details.carType === 'suv') {
+      priceRange = '₹60-85 lakhs';
+      specificEstimate = '₹72 lakhs';
+      models = `${brandText} X3/Q5/GLC`;
+    } else {
+      priceRange = '₹42-85 lakhs';
+      specificEstimate = '₹60 lakhs';
+      models = `${brandText} Range`;
+    }
+  } else if (details.carBrand === 'honda' || details.carBrand === 'toyota' || details.carBrand === 'hyundai') {
+    if (details.carType === 'sedan') {
+      priceRange = '₹12-20 lakhs';
+      specificEstimate = '₹16 lakhs';
+      models = 'City/Camry/Verna';
+    } else if (details.carType === 'suv') {
+      priceRange = '₹15-30 lakhs';
+      specificEstimate = '₹22 lakhs';
+      models = 'Creta/Innova/CR-V';
+    } else {
+      priceRange = '₹12-30 lakhs';
+      specificEstimate = '₹18 lakhs';
+      models = 'Mid-range options';
+    }
+  } else if (details.carBrand === 'maruti' || details.carBrand === 'tata') {
+    if (details.carType === 'hatchback') {
+      priceRange = '₹6-12 lakhs';
+      specificEstimate = '₹8 lakhs';
+      models = 'Swift/Baleno/Tiago';
+    } else if (details.carType === 'suv') {
+      priceRange = '₹8-16 lakhs';
+      specificEstimate = '₹12 lakhs';
+      models = 'Nexon/Vitara/XUV300';
+    } else {
+      priceRange = '₹6-16 lakhs';
+      specificEstimate = '₹10 lakhs';
+      models = 'Entry-level range';
+    }
+  } else {
+    priceRange = '₹8-50 lakhs';
+    specificEstimate = '₹20 lakhs';
+    models = 'Various options';
+  }
+
+  // Adjust for variant
+  if (details.carVariant === 'electric') {
+    specificEstimate = specificEstimate.replace('₹', '₹1.3-1.5x of ');
+  } else if (details.carVariant === 'diesel') {
+    specificEstimate = specificEstimate.replace('₹', '₹1.1-1.2x of ');
+  }
+
+  return `Excellent! Based on your preferences, here's a detailed car pricing analysis:
+
+**🚗 Your Car Requirements:**
+• **Brand**: ${brandText}
+• **Type**: ${typeText || 'Flexible'}
+• **Fuel**: ${variantText || 'Flexible'}
+
+**💰 Pricing Analysis:**
+• **Market Range**: ${priceRange}
+• **Popular Models**: ${models}
+• **Recommended Target**: **${specificEstimate}**
+
+**📊 Total Cost Breakdown:**
+• Ex-showroom price: 85% of budget
+• Insurance (1st year): 3-5% additional
+• Registration & accessories: 8-12% additional
+
+**🎯 Suggested Planning Amount: ${specificEstimate}**
+
+This covers the complete purchase with all on-road costs.
+
+**Next Step:** What timeline are you considering for this purchase? This will help me create your investment strategy.`;
+};
+
+// Generate detailed education pricing
+const generateEducationPricing = (details: GoalDetails): string => {
+  const courseText = details.courseType?.toUpperCase() || 'Course';
+  const institutionText = details.institutionType?.charAt(0).toUpperCase() + details.institutionType?.slice(1) || 'Institution';
+  const levelText = details.courseLevel?.charAt(0).toUpperCase() + details.courseLevel?.slice(1) || 'Degree';
+
+  let priceRange = '';
+  let specificEstimate = '';
+  let breakdown = '';
+
+  // Course and institution-based pricing
+  if (details.courseType === 'engineering') {
+    if (details.institutionType === 'government' || details.specificInstitution === 'iit' || details.specificInstitution === 'nit') {
+      priceRange = '₹8-12 lakhs';
+      specificEstimate = '₹10 lakhs';
+      breakdown = '• Tuition fees: ₹6-8 lakhs\n• Hostel & living: ₹2-3 lakhs\n• Books & materials: ₹1 lakh';
+    } else if (details.institutionType === 'private') {
+      priceRange = '₹15-25 lakhs';
+      specificEstimate = '₹20 lakhs';
+      breakdown = '• Tuition fees: ₹12-18 lakhs\n• Hostel & living: ₹3-5 lakhs\n• Books & materials: ₹2 lakhs';
+    } else {
+      priceRange = '₹30-60 lakhs';
+      specificEstimate = '₹45 lakhs';
+      breakdown = '• Tuition fees: ₹25-45 lakhs\n• Living expenses: ₹8-12 lakhs\n• Travel & misc: ₹2-3 lakhs';
+    }
+  } else if (details.courseType === 'medical') {
+    if (details.institutionType === 'government' || details.specificInstitution === 'aiims') {
+      priceRange = '₹5-10 lakhs';
+      specificEstimate = '₹7 lakhs';
+      breakdown = '• Tuition fees: ₹3-5 lakhs\n• Hostel & living: ₹2-4 lakhs\n• Books & materials: ₹1 lakh';
+    } else if (details.institutionType === 'private') {
+      priceRange = '₹50 lakhs - ₹1 crore';
+      specificEstimate = '₹75 lakhs';
+      breakdown = '• Tuition fees: ₹60-80 lakhs\n• Hostel & living: ₹8-12 lakhs\n• Books & materials: ₹2-3 lakhs';
+    } else {
+      priceRange = '₹80 lakhs - ₹1.5 crores';
+      specificEstimate = '₹1.1 crores';
+      breakdown = '• Tuition fees: ₹80 lakhs - ₹1.2 crores\n• Living expenses: ₹15-20 lakhs\n• Travel & misc: ₹5-8 lakhs';
+    }
+  } else if (details.courseType === 'mba') {
+    if (details.institutionType === 'government' || details.specificInstitution === 'iim') {
+      priceRange = '₹20-25 lakhs';
+      specificEstimate = '₹22 lakhs';
+      breakdown = '• Tuition fees: ₹18-20 lakhs\n• Living expenses: ₹2-4 lakhs\n• Books & materials: ₹1 lakh';
+    } else if (details.institutionType === 'private') {
+      priceRange = '₹15-30 lakhs';
+      specificEstimate = '₹22 lakhs';
+      breakdown = '• Tuition fees: ₹12-25 lakhs\n• Living expenses: ₹3-4 lakhs\n• Books & materials: ₹1 lakh';
+    } else {
+      priceRange = '₹40-80 lakhs';
+      specificEstimate = '₹60 lakhs';
+      breakdown = '• Tuition fees: ₹35-60 lakhs\n• Living expenses: ₹8-15 lakhs\n• Travel & misc: ₹3-5 lakhs';
+    }
+  } else {
+    if (details.institutionType === 'government') {
+      priceRange = '₹5-10 lakhs';
+      specificEstimate = '₹7 lakhs';
+    } else if (details.institutionType === 'private') {
+      priceRange = '₹10-20 lakhs';
+      specificEstimate = '₹15 lakhs';
+    } else {
+      priceRange = '₹25-50 lakhs';
+      specificEstimate = '₹35 lakhs';
+    }
+    breakdown = '• Tuition & fees: 70-80% of budget\n• Living expenses: 15-25%\n• Books & materials: 5-10%';
+  }
+
+  return `Wonderful! Based on your education goals, here's a comprehensive cost analysis:
+
+**🎓 Your Education Requirements:**
+• **Course**: ${courseText} (${levelText})
+• **Institution Type**: ${institutionText}
+• **Target**: ${details.specificInstitution?.toUpperCase() || 'Quality Institution'}
+
+**💰 Cost Analysis:**
+• **Total Range**: ${priceRange}
+• **Recommended Target**: **${specificEstimate}**
+
+**📊 Cost Breakdown:**
+${breakdown}
+
+**🎯 Suggested Planning Amount: ${specificEstimate}**
+
+This covers the complete education cost including living expenses.
+
+**Next Step:** What timeline are you considering? (When will the course start?) This will help me create your investment strategy.`;
+};
+
+// Enhanced function to generate relevant follow-up questions based on user's specific goal
+const generateRelevantFollowUpQuestion = (userResponse: string, conversationHistory: Array<{ role: 'user' | 'assistant', content: string }>): string => {
+  const response = userResponse.toLowerCase();
+  const allUserMessages = conversationHistory
+    .filter(msg => msg.role === 'user')
+    .map(msg => msg.content.toLowerCase())
+    .join(' ');
+
+  // House/Property goal - ask specific details
+  if (allUserMessages.includes('house') || allUserMessages.includes('home') || allUserMessages.includes('property') || allUserMessages.includes('apartment')) {
+    if (!allUserMessages.includes('mumbai') && !allUserMessages.includes('delhi') && !allUserMessages.includes('bangalore') && !allUserMessages.includes('pune') && !allUserMessages.includes('hyderabad') && !allUserMessages.includes('chennai')) {
+      return "Great! A house is one of the most important investments. To help you with accurate pricing, which city or area are you considering?\n\n**Sample answers:**\n• \"Mumbai, looking at suburbs\"\n• \"Bangalore, near IT corridor\"\n• \"Pune, any decent locality\"\n• \"Delhi, with metro connectivity\"";
+    }
+    
+    if (!allUserMessages.includes('bhk') && !allUserMessages.includes('bedroom') && !allUserMessages.includes('room')) {
+      return "Perfect! Now, what size property are you looking for?\n\n**Sample answers:**\n• \"2 BHK apartment\"\n• \"3 BHK independent house\"\n• \"1 BHK for investment\"\n• \"4 BHK with garden\"";
+    }
+    
+    return "Excellent! Based on your requirements, I can help estimate the budget. Do you have any preference for:\n• Apartment complex or independent house?\n• Any specific area within the city?\n• New construction or ready-to-move-in?\n\nThis will help me give you accurate pricing.";
+  }
+
+  // Car/Vehicle goal - ask specific details  
+  else if (allUserMessages.includes('car') || allUserMessages.includes('vehicle') || allUserMessages.includes('bike') || allUserMessages.includes('auto')) {
+    if (!allUserMessages.includes('maruti') && !allUserMessages.includes('hyundai') && !allUserMessages.includes('honda') && !allUserMessages.includes('toyota') && !allUserMessages.includes('bmw') && !allUserMessages.includes('audi') && !allUserMessages.includes('mercedes')) {
+      return "Excellent choice! Cars vary significantly in price based on brand and type. Do you have any brand preferences?\n\n**Sample answers:**\n• \"Maruti or Hyundai, budget-friendly\"\n• \"Honda or Toyota for reliability\"\n• \"BMW or Audi, luxury segment\"\n• \"Any good brand, no specific preference\"";
+    }
+    
+    if (!allUserMessages.includes('hatchback') && !allUserMessages.includes('sedan') && !allUserMessages.includes('suv') && !allUserMessages.includes('compact')) {
+      return "Great! What type of car are you looking for?\n\n**Sample answers:**\n• \"SUV for family and long drives\"\n• \"Sedan for city commuting\"\n• \"Hatchback, easy to park\"\n• \"Compact SUV, best of both\"";
+    }
+    
+    return "Perfect! To give you the most accurate pricing, could you share:\n• Any specific model you're interested in?\n• Petrol, diesel, or electric preference?\n• New car or considering pre-owned?\n\nThis will help me provide precise cost estimates.";
+  }
+
+  // Education goal - ask specific details
+  else if (allUserMessages.includes('education') || allUserMessages.includes('college') || allUserMessages.includes('course') || allUserMessages.includes('study') || allUserMessages.includes('degree')) {
+    if (!allUserMessages.includes('engineering') && !allUserMessages.includes('medical') && !allUserMessages.includes('mba') && !allUserMessages.includes('commerce') && !allUserMessages.includes('arts')) {
+      return "Wonderful! Education is a great investment. What type of course or field are you planning for?\n\n**Sample answers:**\n• \"Engineering, computer science\"\n• \"Medical, MBBS course\"\n• \"MBA from good college\"\n• \"Commerce, CA preparation\"";
+    }
+    
+    if (!allUserMessages.includes('government') && !allUserMessages.includes('private') && !allUserMessages.includes('international') && !allUserMessages.includes('abroad')) {
+      return "Excellent choice! Do you have a preference for the type of institution?\n\n**Sample answers:**\n• \"Government colleges, affordable fees\"\n• \"Private institutions, good facilities\"\n• \"International universities abroad\"\n• \"Both government and private options\"";
+    }
+    
+    return "Great! To provide accurate cost estimates, could you share:\n• Any specific colleges or universities in mind?\n• Bachelor's or Master's level?\n• When will the course start?\n\nThis will help me research current education costs.";
+  }
+
+  // Business/Investment goal - ask specific details
+  else if (allUserMessages.includes('business') || allUserMessages.includes('startup') || allUserMessages.includes('investment') || allUserMessages.includes('shop')) {
+    return "Fantastic! Starting a business is exciting. To help estimate the investment needed, could you share:\n\n**Business Details:**\n• What type of business? (restaurant, retail, online, services)\n• Scale: Small local setup or larger operation?\n• Location: Home-based, rented space, or own premises?\n\n**Sample answers:**\n• \"Small restaurant, local area\"\n• \"Online clothing business\"\n• \"Grocery shop in my locality\"";
+  }
+
+  // Travel goal - ask specific details
+  else if (allUserMessages.includes('travel') || allUserMessages.includes('trip') || allUserMessages.includes('vacation') || allUserMessages.includes('tour')) {
+    return "Amazing! Travel goals are so refreshing. To help estimate the budget, could you share:\n\n**Travel Details:**\n• Destination: Domestic or international?\n• Duration: How many days/weeks?\n• Type: Budget travel, comfort, or luxury?\n\n**Sample answers:**\n• \"Europe trip for 2 weeks\"\n• \"Domestic India tour, 10 days\"\n• \"International honeymoon, 1 week\"";
+  }
+
+  // Wedding/Marriage goal - ask specific details
+  else if (allUserMessages.includes('wedding') || allUserMessages.includes('marriage') || allUserMessages.includes('shaadi')) {
+    return "Congratulations on your upcoming wedding! To help plan the budget, could you share:\n\n**Wedding Details:**\n• Scale: Intimate ceremony or grand celebration?\n• Guest count: Approximate number?\n• Location: Home, banquet hall, or destination?\n\n**Sample answers:**\n• \"Simple ceremony, 100-150 guests\"\n• \"Grand wedding, 300+ people\"\n• \"Destination wedding in Goa\"";
+  }
+
+  // General/unclear goal - ask for clarification
+  else {
+    return "I'd love to help you plan for your goal! To provide the most relevant guidance, could you tell me a bit more about what specifically you're planning for?\n\n**Common goals:**\n• Buying a house or property\n• Purchasing a car or vehicle\n• Child's education expenses\n• Starting a business\n• Wedding or marriage\n• Travel or vacation\n• Other specific goal\n\nJust describe what you have in mind!";
+  }
+};
+
+// Helper function to handle adaptive responses when users give unexpected replies
+const handleAdaptiveResponse = (userResponse: string, currentStep: string, _extracted: any, conversationHistory: Array<{ role: 'user' | 'assistant', content: string }> = []): string => {
+  const response = userResponse.toLowerCase();
+  
+  // Check if this is a follow-up response to a previous question about details
+  const lastAssistantMessage = conversationHistory
+    .filter(msg => msg.role === 'assistant')
+    .slice(-1)[0]?.content.toLowerCase() || '';
+  
+  // If the last assistant message was asking for details, process the user's response
+  if (lastAssistantMessage.includes('which city') || lastAssistantMessage.includes('what type') || 
+      lastAssistantMessage.includes('any specific') || lastAssistantMessage.includes('could you tell me') ||
+      lastAssistantMessage.includes('sample answers') || lastAssistantMessage.includes('could you share')) {
+    
+    return processFollowUpDetails(userResponse, conversationHistory);
+  }
+  
+  // If user gives a rough goal idea but can't provide budget, ask relevant follow-up questions
+  if (currentStep === 'goal_amount_timeline' || currentStep === 'goal_amount_determination') {
+    // If user expresses uncertainty about budget/amount
+    if (response.includes('not sure') || response.includes('don\'t know') || response.includes('unclear') || 
+        response.includes('no idea') || response.includes('unsure') || response.includes('not certain') ||
+        response.includes('help me') || response.includes('no clue') || response.includes('confused')) {
+      
+      return generateRelevantFollowUpQuestion(userResponse, conversationHistory);
+    }
+    
+    // If user gives a very general goal without specifics
+    const generalGoalTerms = ['house', 'car', 'education', 'business', 'travel', 'wedding', 'investment'];
+    const hasGeneralGoal = generalGoalTerms.some(term => response.includes(term));
+    const hasSpecifics = response.includes('bhk') || response.includes('lakh') || response.includes('crore') || 
+                        response.includes('year') || response.includes('month') || response.includes('mumbai') || 
+                        response.includes('delhi') || response.includes('bangalore');
+    
+    if (hasGeneralGoal && !hasSpecifics && response.split(' ').length < 8) {
+      return generateRelevantFollowUpQuestion(userResponse, conversationHistory);
+    }
+    
+    if (response.includes('urgent') || response.includes('asap') || response.includes('quickly')) {
+      return "I understand you need this quickly! That's important context. Let me help you find the most efficient way to achieve your goal. What's the specific item or goal you're looking at, and do you have any idea about the cost range?";
+    }
+    
+    if (response.includes('family') || response.includes('growing') || response.includes('children')) {
+      return "Family considerations are crucial in financial planning! Let me help you find the best solution that works for your family's needs. What specific goal are you planning for, and do you have any budget range in mind?";
+    }
+  }
+  
+  if (currentStep === 'income_savings') {
+    if (response.includes('unstable') || response.includes('irregular') || response.includes('variable')) {
+      return "I understand your income is irregular. That's actually quite common! Let me help you create a flexible plan that works with your income pattern. What's your average monthly income, and what's the minimum you can consistently invest?";
+    }
+    
+    if (response.includes('low') || response.includes('not enough') || response.includes('struggling')) {
+      return "I understand you're concerned about your current financial capacity. Don't worry - there are always ways to work towards your goals! Let me help you explore options that fit your current situation. What's your current monthly income?";
+    }
+  }
+  
+  if (currentStep === 'existing_savings') {
+    if (response.includes('nothing') || response.includes('zero') || response.includes('starting fresh')) {
+      return "Starting fresh is perfectly fine! Many successful investors begin with zero savings. Let me help you create a plan that builds your financial foundation from the ground up. What's your current monthly income?";
+    }
+    
+    if (response.includes('debt') || response.includes('loans') || response.includes('borrowed')) {
+      return "I understand you have existing debt. That's an important factor to consider in your financial planning. Let me help you create a plan that addresses both your debt and your goals. What's the total amount of debt you're carrying?";
+    }
+  }
+  
+  // Enhanced default adaptive response based on conversation context
+  return generateIntelligentFollowUpQuestion(userResponse, currentStep, conversationHistory);
+};
+
+// Function to generate intelligent, context-aware follow-up questions
+const generateIntelligentFollowUpQuestion = (userResponse: string, currentStep: string, conversationHistory: Array<{ role: 'user' | 'assistant', content: string }>): string => {
+  const response = userResponse.toLowerCase();
+  
+  // Analyze what information we already have from the conversation
+  const allUserMessages = conversationHistory.filter(msg => msg.role === 'user').map(msg => msg.content).join(' ').toLowerCase();
+  const hasGoalMentioned = allUserMessages.includes('house') || allUserMessages.includes('car') || allUserMessages.includes('education') || 
+                          allUserMessages.includes('business') || allUserMessages.includes('travel') || allUserMessages.includes('wedding');
+  
+  // Extract any financial figures mentioned
+  const extractedFigures = extractFinancialFigures(allUserMessages, 'general');
+  
+  // Context-specific intelligent questions based on current step and conversation state
+  switch (currentStep) {
+    case 'goal_collection':
+      if (response.length < 5) {
+        return "I'd love to help you with your financial planning! What's your main financial goal or something you're looking to save money for?\n\n**For example:**\n• \"I want to buy my own house\"\n• \"Planning for my child's education\"\n• \"Looking to buy a car\"\n• \"Starting a business\"\n• \"Retirement planning\"";
+      }
+      
+      if (hasGoalMentioned) {
+        return "Great! I can see you're interested in financial planning. To give you the most accurate advice, could you share what specific goal you'd like to achieve?\n\n**Please tell me:**\n• What exactly are you planning for?\n• Any specific timeline you have in mind?\n• Do you have a rough idea of the cost?";
+      }
+      
+      return "I'm here to help you create a personalized financial plan! What's the main thing you'd like to save money for or achieve financially?\n\n**Popular goals:**\n• Buying property (house/apartment)\n• Vehicle purchase (car/bike)\n• Education planning\n• Business investment\n• Travel or lifestyle goals";
+      
+    case 'goal_amount_determination':
+      if (!extractedFigures.amount) {
+        if (allUserMessages.includes('house') || allUserMessages.includes('property')) {
+          return "Perfect! For house planning, I need to understand the cost range. **What's your target budget for the property?**\n\n**If you're unsure:**\n• Which city are you looking at?\n• What type of property (2BHK, 3BHK)?\n• Any area preferences?\n\nI can help research current market prices with these details!";
+        }
+        
+        if (allUserMessages.includes('car') || allUserMessages.includes('vehicle')) {
+          return "Excellent! For your car purchase plan, **what's your target budget?**\n\n**If you're not sure about pricing:**\n• Any specific brand you prefer?\n• What type of car (hatchback, sedan, SUV)?\n• New or pre-owned?\n\nI can provide current market pricing with these details!";
+        }
+        
+        if (allUserMessages.includes('education') || allUserMessages.includes('college')) {
+          return "Great goal! Education is a wonderful investment. **What's your target budget for education expenses?**\n\n**If you need help estimating:**\n• What type of course/degree?\n• Government or private institutions?\n• Any specific colleges in mind?\n\nI can help you find current education costs!";
+        }
+        
+        return "I understand your goal! To create the best financial plan, **what's your target amount for this goal?**\n\n**If you're unsure about the cost:**\n• Share more details about what exactly you're planning\n• Any specifications or requirements you have\n• Timeline when you need this\n\nI'll help you research accurate pricing!";
+      }
+      
+      return "Thanks for sharing! I have your goal details. Now I need to understand your financial situation better. **What's your current monthly income and how much can you realistically invest towards this goal each month?**";
+      
+    case 'goal_timeline_determination':
+      return "Great! I have your goal and budget. **When are you planning to achieve this goal?**\n\n**Examples:**\n• \"In 3 years\"\n• \"5 years from now\"\n• \"My child will need this in 8 years\"\n• \"As soon as possible\"";
+      
+    case 'income_savings':
+      if (!extractedFigures.income) {
+        return "Perfect! Now I need to understand your financial capacity. **Could you share:**\n\n**1. Your monthly income** (salary, business income, etc.)\n**2. How much you can invest monthly** towards this goal\n\n**Example:** \"I earn ₹8 LPA and can invest ₹25,000 monthly\"";
+      }
+      
+      if (!extractedFigures.existingSavings) {
+        return "Excellent! I have your income details. **Do you have any existing savings or investments** that we can consider for this goal?\n\n**Examples:**\n• \"₹3 lakhs in FDs and ₹2 lakhs in mutual funds\"\n• \"No existing savings, starting fresh\"\n• \"₹5 lakhs in PPF\"";
+      }
+      
+      return "Thank you for the financial details! Let me analyze your goal feasibility and create a comprehensive investment plan.";
+      
+    case 'feasibility_analysis':
+      return "Based on all your details, I'm preparing a complete feasibility analysis with investment recommendations. This will show if your goal is achievable and the best strategy to reach it.";
+      
+    default:
+      // Analyze user response for better contextual questions
+      if (response.includes('yes') || response.includes('sure') || response.includes('okay')) {
+        return "Great! I'm ready to help you create a personalized financial plan. **What's your main financial goal?** Are you planning to:\n\n• Buy a house or property?\n• Purchase a vehicle?\n• Save for education?\n• Start a business?\n• Something else?";
+      }
+      
+      if (response.includes('help') || response.includes('confused') || response.includes('not sure')) {
+        return "No worries! I'm here to guide you through this. Let's start simple. **What's one thing you'd like to save money for or achieve financially?**\n\n**Think about:**\n• Something you want to buy\n• A goal you want to achieve\n• A dream you want to fulfill\n\nJust tell me in your own words!";
+      }
+      
+      return "I understand you're interested in financial planning! **To give you the best personalized advice, could you tell me:**\n\n• What's your main financial goal?\n• What are you looking to save money for?\n• Any specific target you have in mind?\n\n**Just describe it in your own words** - I'll help you create a plan for it!";
+  }
+};
+
+// Enhanced helper function to search for pricing information and ask contextual questions
+const searchPricingInformation = async (goalDescription: string, conversationHistory: Array<{ role: 'user' | 'assistant', content: string }>): Promise<string> => {
+  try {
+    console.log('Searching for pricing information for:', goalDescription);
+    
+    // Analyze the goal description to determine what additional context we need
+    const needsLocationContext = (goalDescription.toLowerCase().includes('house') || 
+                                  goalDescription.toLowerCase().includes('home') || 
+                                  goalDescription.toLowerCase().includes('property') ||
+                                  goalDescription.toLowerCase().includes('apartment') ||
+                                  goalDescription.toLowerCase().includes('flat'));
+    
+    const needsBrandContext = (goalDescription.toLowerCase().includes('car') || 
+                               goalDescription.toLowerCase().includes('vehicle') ||
+                               goalDescription.toLowerCase().includes('bike') ||
+                               goalDescription.toLowerCase().includes('motorcycle'));
+    
+    const needsEducationContext = (goalDescription.toLowerCase().includes('education') || 
+                                   goalDescription.toLowerCase().includes('college') || 
+                                   goalDescription.toLowerCase().includes('university') ||
+                                   goalDescription.toLowerCase().includes('course') ||
+                                   goalDescription.toLowerCase().includes('mba') ||
+                                   goalDescription.toLowerCase().includes('engineering'));
+
+    // Check if user has already provided specific details in conversation
+    const recentUserMessages = conversationHistory
+      .filter(msg => msg.role === 'user')
+      .slice(-3)
+      .map(msg => msg.content.toLowerCase())
+      .join(' ');
+
+    // Create contextual search query
+    let searchQuery = '';
+    let contextualQuestions: string[] = [];
+    
+    if (needsLocationContext) {
+      searchQuery = `${goalDescription} price cost in India 2024 average`;
+      
+      if (!recentUserMessages.includes('mumbai') && !recentUserMessages.includes('delhi') && 
+          !recentUserMessages.includes('bangalore') && !recentUserMessages.includes('pune') &&
+          !recentUserMessages.includes('city') && !recentUserMessages.includes('location')) {
+        contextualQuestions.push(
+          "📍 **Location Details**: Which city or area are you looking at? (e.g., Mumbai suburbs, Delhi NCR, Bangalore IT corridor)"
+        );
+      }
+      
+      if (!recentUserMessages.includes('bhk') && !recentUserMessages.includes('bedroom') && 
+          !recentUserMessages.includes('size') && !recentUserMessages.includes('area')) {
+        contextualQuestions.push(
+          "🏠 **Property Type**: What type of property? (e.g., 2 BHK apartment, 3 BHK independent house, 1200 sq ft)"
+        );
+      }
+      
+    } else if (needsBrandContext) {
+      searchQuery = `${goalDescription} price India 2024 models`;
+      
+      if (!recentUserMessages.includes('brand') && !recentUserMessages.includes('model') &&
+          !recentUserMessages.includes('maruti') && !recentUserMessages.includes('hyundai') &&
+          !recentUserMessages.includes('tata') && !recentUserMessages.includes('honda')) {
+        contextualQuestions.push(
+          "🚗 **Vehicle Preferences**: Any specific brand or model in mind? (e.g., Maruti Swift, Hyundai Creta, Honda City)"
+        );
+      }
+      
+      if (!recentUserMessages.includes('variant') && !recentUserMessages.includes('type') &&
+          !recentUserMessages.includes('petrol') && !recentUserMessages.includes('diesel')) {
+        contextualQuestions.push(
+          "⚙️ **Variant Details**: Any preferences for variant/fuel type? (e.g., petrol automatic, diesel manual, top variant)"
+        );
+      }
+      
+    } else if (needsEducationContext) {
+      searchQuery = `${goalDescription} cost fees India 2024`;
+      
+      if (!recentUserMessages.includes('engineering') && !recentUserMessages.includes('medical') &&
+          !recentUserMessages.includes('mba') && !recentUserMessages.includes('degree') &&
+          !recentUserMessages.includes('course')) {
+        contextualQuestions.push(
+          "🎓 **Course Details**: What specific course or degree? (e.g., Engineering, MBA, Medical, B.Tech, Study abroad)"
+        );
+      }
+      
+      if (!recentUserMessages.includes('government') && !recentUserMessages.includes('private') &&
+          !recentUserMessages.includes('college') && !recentUserMessages.includes('university')) {
+        contextualQuestions.push(
+          "🏫 **Institution Type**: Government or private institution? (Government colleges are typically cheaper)"
+        );
+      }
+      
+    } else {
+      searchQuery = `${goalDescription} price cost in India 2024`;
+    }
+    
+    // Perform web search
+    const searchResult = await webSearchService.searchWeb(searchQuery);
+    
+    if (searchResult.success && searchResult.results && searchResult.results.length > 0) {
+      const topResult = searchResult.results[0];
+      let response = `Based on current market research, here's what I found about ${goalDescription}:\n\n${topResult?.snippet || 'Current market information'}\n\nSource: ${topResult?.title || 'Market Research'}`;
+      
+      // Add contextual questions to get more specific information
+      if (contextualQuestions.length > 0) {
+        response += `\n\n**To provide more accurate estimates, I'd like to know:**\n\n${contextualQuestions.join('\n')}\n\nOnce you provide these details, I can give you a more precise cost estimate for your financial planning.`;
+    } else {
+        response += `\n\nThis gives us a good starting point for your financial planning. Would you like to proceed with this estimate, or do you have a more specific budget in mind?`;
+      }
+      
+      return response;
+    } else {
+      // Fallback when search fails - still ask contextual questions
+      let response = `I'd like to help you find current pricing for ${goalDescription}. `;
+      
+      if (contextualQuestions.length > 0) {
+        response += `To provide accurate estimates, please share:\n\n${contextualQuestions.join('\n')}\n\nWith these details, I can research current market prices and help you set a realistic target amount.`;
+      } else {
+        response += `Could you tell me more about your specific requirements (like location, size, brand, etc.) so I can provide a more accurate estimate?`;
+      }
+      
+      return response;
+    }
+  } catch (error) {
+    console.error('Error searching for pricing information:', error);
+    return `I'd like to help you find current pricing for ${goalDescription}. Could you share specific details about your requirements (like location, size, brand, type, etc.) so I can provide a better estimate? This will help me research current market data and give you accurate cost projections.`;
+  }
+};
 
 // Helper function to format questions with sample answer formats
 const formatQuestionWithSamples = (question: string, questionType: string): string => {
@@ -45,71 +1138,97 @@ Sample format:
 ${samples.join('\n')}`;
 };
 
-// Function to determine current step in the conversation
-const determineCurrentStep = (conversationHistory: Array<{ role: 'user' | 'assistant', content: string }>, extracted: any): string => {
+// Function to determine current step in the conversation - SIMPLIFIED VERSION
+const determineCurrentStep = (conversationHistory: Array<{ role: 'user' | 'assistant', content: string }>, extracted: any, userInfo?: { username?: string; isAuthenticated?: boolean }): string => {
+  console.log('=== STEP DETERMINATION DEBUG ===');
+  
   const allUserMessages = conversationHistory.filter(msg => msg.role === 'user').map(msg => msg.content).join(' ').toLowerCase();
   const allAssistantMessages = conversationHistory.filter(msg => msg.role === 'assistant').map(msg => msg.content).join(' ').toLowerCase();
   
-  // Check what questions have already been asked
-  const hasAskedAmount = allAssistantMessages.includes('target amount') || allAssistantMessages.includes('cost') || allAssistantMessages.includes('budget');
-  const hasAskedTimeline = allAssistantMessages.includes('timeline') || allAssistantMessages.includes('years') || allAssistantMessages.includes('when');
-  const hasAskedIncome = allAssistantMessages.includes('income') || allAssistantMessages.includes('salary') || allAssistantMessages.includes('earn') || allAssistantMessages.includes('lpa');
-  const hasAskedInvestment = allAssistantMessages.includes('invest') || allAssistantMessages.includes('save') || allAssistantMessages.includes('monthly');
-  const hasAskedSavings = allAssistantMessages.includes('existing') || allAssistantMessages.includes('savings') || allAssistantMessages.includes('fd') || allAssistantMessages.includes('mutual fund');
+  console.log('All user messages:', allUserMessages);
+  console.log('All assistant messages (last 100 chars):', allAssistantMessages.slice(-100));
   
-  console.log('Step determination - Questions asked:', {
+  // Simple goal detection - if user has mentioned any common goal words
+  const hasGoal = allUserMessages.includes('house') || 
+                 allUserMessages.includes('car') || 
+                 allUserMessages.includes('education') || 
+                 allUserMessages.includes('buy') || 
+                 allUserMessages.includes('want') ||
+                 allUserMessages.includes('goal') ||
+                 allUserMessages.includes('home') ||
+                 allUserMessages.includes('property') ||
+                 allUserMessages.includes('marriage') ||
+                 allUserMessages.includes('wedding') ||
+                 allUserMessages.includes('retirement') ||
+                 allUserMessages.includes('business') ||
+                 allUserMessages.includes('study') ||
+                 allUserMessages.includes('college') ||
+                 allUserMessages.includes('travel') ||
+                 allUserMessages.includes('dream') ||
+                 allUserMessages.includes('plan') ||
+                 // If user has written a long descriptive message (likely contains goal)
+                 allUserMessages.replace(/[^\w\s]/g, '').split(' ').filter(word => word.length > 2).length > 6;
+  
+  // Check what's been asked by looking at assistant messages - COMPREHENSIVE GOAL DETECTION
+  const hasAskedGoal = allAssistantMessages.includes('inspirational life goal') || 
+                       allAssistantMessages.includes('what you want to accomplish') ||
+                       allAssistantMessages.includes('financial goal') ||
+                       allAssistantMessages.includes('what inspirational life goal do you have') ||
+                       allAssistantMessages.includes('buy a house worth') ||
+                       allAssistantMessages.includes('save for child') ||
+                       allAssistantMessages.includes('plan for retirement') ||
+                       // Check for sample formats that would have been shown to user
+                       allAssistantMessages.includes('sample format') ||
+                       // Also check conversation position - if we're past message 3/4, goal was likely asked
+                       (conversationHistory.length > (userInfo?.isAuthenticated ? 2 : 3));
+  
+  const hasAskedAmount = allAssistantMessages.includes('target budget') || 
+                        allAssistantMessages.includes('target amount') ||
+                        allAssistantMessages.includes('approximate cost') ||
+                        allAssistantMessages.includes('budget');
+
+  console.log('Goal detection:', {
+    hasGoal,
+    hasAskedGoal,
     hasAskedAmount,
-    hasAskedTimeline,
-    hasAskedIncome,
-    hasAskedInvestment,
-    hasAskedSavings
+    extractedAmount: extracted.amount,
+    extractedTimeline: extracted.timeline,
+    extractedIncome: extracted.income
   });
   
-  // Step 3.1: Goal, Amount & Timeline Collection
-  if (!extracted.amount && !hasAskedAmount) {
-    return 'goal_amount_timeline';
-  }
-  if (extracted.amount && !extracted.timeline && !hasAskedTimeline) {
-    return 'goal_amount_timeline';
+  // Step 1: If no goal detected AND haven't asked for goal yet
+  if (!hasGoal && !hasAskedGoal) {
+    console.log('→ STEP: goal_collection (no goal detected and not asked yet)');
+    return 'goal_collection';
   }
   
-  // Step 3.2: Income Source & Monthly Savings Assessment
-  if ((!extracted.income || !extracted.monthlyInvestment) && !hasAskedIncome) {
+  // Step 2: If goal detected OR goal was asked (user likely provided goal), but no amount
+  if ((hasGoal || hasAskedGoal) && !extracted.amount) {
+    console.log('→ STEP: goal_amount_determination (goal detected or asked, no amount)');
+    return 'goal_amount_determination';
+  }
+  
+  // Step 3: If goal and amount but no timeline
+  if ((hasGoal || hasAskedGoal) && extracted.amount && !extracted.timeline) {
+    console.log('→ STEP: goal_timeline_determination (have goal & amount, need timeline)');
+    return 'goal_timeline_determination';
+  }
+  
+  // Step 4: If goal, amount, timeline but no income
+  if ((hasGoal || hasAskedGoal) && extracted.amount && extracted.timeline && !extracted.income) {
+    console.log('→ STEP: income_savings (have goal, amount & timeline, need income)');
     return 'income_savings';
   }
   
-  // Step 3.3: Existing Savings & Assets Check
-  if (!extracted.existingSavings && !hasAskedSavings && !allUserMessages.includes('existing') && !allUserMessages.includes('savings') && !allUserMessages.includes('investment') && !allUserMessages.includes('asset')) {
-    return 'existing_savings';
-  }
-  
-  // Step 3.4: Goal Feasibility Analysis
-  if (extracted.amount && extracted.timeline && extracted.income && extracted.monthlyInvestment) {
+  // Step 5: If we have goal, amount, timeline, income - do feasibility
+  if ((hasGoal || hasAskedGoal) && extracted.amount && extracted.timeline && extracted.income) {
+    console.log('→ STEP: feasibility_analysis (have all required info)');
     return 'feasibility_analysis';
   }
   
-  // If we have all basic info but haven't asked about existing savings, ask that
-  if (extracted.amount && extracted.timeline && extracted.income && !hasAskedSavings) {
-    return 'existing_savings';
-  }
-  
-  // If we have goal and timeline but no income info, ask for income
-  if (extracted.amount && extracted.timeline && !extracted.income && !hasAskedIncome) {
-    return 'income_savings';
-  }
-  
-  // If we have goal but no timeline, ask for timeline
-  if (extracted.amount && !extracted.timeline && !hasAskedTimeline) {
-    return 'goal_amount_timeline';
-  }
-  
-  // If we have goal but no amount, ask for amount
-  if (!extracted.amount && !hasAskedAmount) {
-    return 'goal_amount_timeline';
-  }
-  
-  // Default to feasibility analysis if we have enough info
-  return 'feasibility_analysis';
+  // Fallback
+  console.log('→ STEP: goal_collection (fallback)');
+  return 'goal_collection';
 };
 
 // Function to generate step-based questions
@@ -129,6 +1248,9 @@ const generateStepBasedQuestion = async (
       .slice(-3) // Check last 3 assistant messages
       .map(msg => msg.content.toLowerCase());
     
+    const hasRecentlyAskedGoal = recentAssistantMessages.some(msg => 
+      msg.includes('financial goal') || msg.includes('what you want to achieve') || msg.includes('specific goal')
+    );
     const hasRecentlyAskedAmount = recentAssistantMessages.some(msg => 
       msg.includes('target amount') || msg.includes('cost') || msg.includes('budget')
     );
@@ -143,6 +1265,7 @@ const generateStepBasedQuestion = async (
     );
     
     console.log('Question generation - Recent questions asked:', {
+      hasRecentlyAskedGoal,
       hasRecentlyAskedAmount,
       hasRecentlyAskedTimeline,
       hasRecentlyAskedIncome,
@@ -150,24 +1273,126 @@ const generateStepBasedQuestion = async (
     });
     
     switch (currentStep) {
-      case 'goal_amount_timeline':
-        if (!extracted.amount && !hasRecentlyAskedAmount) {
+      case 'goal_collection':
           return {
             success: true,
-            message: `${greeting}What is the target amount for your goal? If you're not sure about the cost, I can help you research current market prices.
+            message: `${greeting}What inspirational life goal do you have? I would love to hear from you – it could be investment advice, any goal you want to accomplish, or even just curiosity on any investment or anything else too.
+
+Please share your goal in your own words. There's no specific format required – just tell me what you're hoping to achieve and I'll help you create a plan for it.`
+        };
+        
+      case 'goal_amount_determination':
+        if (!hasRecentlyAskedAmount) {
+          // Extract the goal from previous user message for personalized response
+          const lastUserMessage = conversationHistory.filter(msg => msg.role === 'user').slice(-1)[0]?.content || '';
+          const goalMention = lastUserMessage.includes('buy') || lastUserMessage.includes('purchase') ? 'this purchase' : 'achieving this goal';
+          
+          return {
+            success: true,
+            message: `${greeting}Great choice! Now, what's your target budget for ${goalMention}?
 
 Sample format:
-• "50 lakhs" or "1 crore"
-• "Around ₹75 lakhs in my city"
-• "Between 60-80 lakhs depending on location"
-• "I'm not sure about the cost"`
+• "Around ₹50 lakhs"
+• "Between ₹25-30 lakhs"  
+• "I'm not sure about the exact amount" (I can help you research current market prices)`
+          };
+        }
+        
+        // If we've already asked for amount, user might be having trouble providing it
+        // Use adaptive response to help them
+        const lastUserMessageAmount = conversationHistory
+          .filter(msg => msg.role === 'user')
+          .slice(-1)[0]?.content || '';
+        
+        if (lastUserMessageAmount) {
+          try {
+            const adaptiveResponse = handleAdaptiveResponse(lastUserMessageAmount, 'goal_amount_determination', extracted, conversationHistory);
+            return {
+              success: true,
+              message: `${greeting}${adaptiveResponse}`
+            };
+          } catch (error) {
+            console.error('Error in handleAdaptiveResponse for amount determination:', error);
+            // Fallback response
+            return {
+              success: true,
+              message: `${greeting}I understand you might need help determining the cost. Could you share more details about your goal? For example, if it's a house - which city and what type? If it's a car - any specific brand or model? This will help me research current market prices for you.`
+            };
+          }
+        }
+        
+        return {
+          success: true,
+          message: `${greeting}I'm here to help you determine the target amount for your goal. Could you provide more details about what you're planning to achieve?`
+        };
+        break;
+        
+      case 'goal_timeline_determination':
+        if (!hasRecentlyAskedTimeline) {
+          return {
+            success: true,
+            message: `${greeting}Perfect! What's your target timeline for achieving this goal?
+
+Sample format:
+• "5 years"
+• "3-4 years"
+• "I want it in 2 years"`
+          };
+        }
+        break;
+        
+      case 'goal_amount_timeline':
+        if (!extracted.amount && !hasRecentlyAskedAmount) {
+          // Check if user mentioned a specific goal but didn't provide amount
+          const lastUserMessage = conversationHistory
+            .filter(msg => msg.role === 'user')
+            .slice(-1)[0]?.content || '';
+          
+          // If user mentioned a specific item but no amount, search for pricing
+          if (lastUserMessage && !lastUserMessage.includes('lakh') && !lastUserMessage.includes('crore') && !lastUserMessage.includes('₹') && !lastUserMessage.includes('year') && !lastUserMessage.includes('month')) {
+            try {
+              const pricingInfo = await searchPricingInformation(lastUserMessage, conversationHistory);
+            return {
+              success: true,
+              message: `${greeting}${pricingInfo}`
+            };
+            } catch (error) {
+              console.error('Error in searchPricingInformation:', error);
+              // Fallback to basic response if pricing search fails
+              return {
+                success: true,
+                message: `${greeting}I'd love to help you research pricing for your goal! Could you tell me more details about what you're looking for? For example, if it's a house - which city, what type? If it's a car - any specific brand or model? This will help me provide accurate cost estimates.`
+              };
+            }
+          }
+          
+          return {
+            success: true,
+            message: `${greeting}Great! Now I need to understand the specifics of your goal to create an accurate financial plan. 
+
+Let me ask this step by step:
+
+**Target Amount** - What's the approximate cost you're expecting for this goal?
+
+Sample responses:
+• "Around ₹50 lakhs" or "₹1 crore"
+• "Between ₹75-80 lakhs depending on specifications"
+• "I'm not sure about the exact cost" (I'll help you research current market prices)
+
+**If you're unsure about the amount**, I can help you research current pricing by understanding:
+• Specific details about what you're looking for
+• Location or area preferences
+• Brand, size, or type specifications
+• Any other requirements that affect cost
+
+Just share what you know, and I'll guide you through finding realistic cost estimates using current market data!`
 
           };
         }
         if (extracted.amount && !extracted.timeline && !hasRecentlyAskedTimeline) {
           return {
             success: true,
-            message: `${greeting}What is your target timeline for achieving this goal?
+            message: `${greeting}Perfect! I have the amount (${extracted.amount}). Now I need to know your target timeline for achieving this goal.
 
 Sample format:
 • "5 years" or "10 years"
@@ -180,7 +1405,28 @@ Sample format:
         if (extracted.amount && extracted.timeline) {
           return generateStepBasedQuestion('income_savings', conversationHistory, extracted, userInfo);
         }
-        // If we've already asked recently, wait for user response
+        // If we've already asked recently, check if user gave unexpected response
+        const lastUserMessageGoal = conversationHistory
+          .filter(msg => msg.role === 'user')
+          .slice(-1)[0]?.content || '';
+        
+        if (lastUserMessageGoal) {
+          try {
+            const adaptiveResponse = handleAdaptiveResponse(lastUserMessageGoal, 'goal_amount_timeline', extracted, conversationHistory);
+          return {
+            success: true,
+            message: `${greeting}${adaptiveResponse}`
+          };
+          } catch (error) {
+            console.error('Error in handleAdaptiveResponse:', error);
+            // Fallback response
+            return {
+              success: true,
+              message: `${greeting}I understand you're sharing your goal with me. Could you tell me what the target amount would be for achieving this goal? If you're not sure about the exact cost, I can help you research current market prices.`
+            };
+          }
+        }
+        
         return {
           success: true,
           message: `${greeting}I'm waiting for your response to help me understand your goal better.`
@@ -199,7 +1445,19 @@ Sample format:
 
           };
         }
-        // If we've already asked recently, wait for user response
+        // If we've already asked recently, check if user gave unexpected response
+        const lastUserMessageIncome = conversationHistory
+          .filter(msg => msg.role === 'user')
+          .slice(-1)[0]?.content || '';
+        
+        if (lastUserMessageIncome) {
+          const adaptiveResponse = handleAdaptiveResponse(lastUserMessageIncome, 'income_savings', extracted, conversationHistory);
+          return {
+            success: true,
+            message: `${greeting}${adaptiveResponse}`
+          };
+        }
+        
         return {
           success: true,
           message: `${greeting}I'm waiting for your income and investment details to proceed with the analysis.`
@@ -218,7 +1476,19 @@ Sample format:
 
           };
         }
-        // If we've already asked recently, wait for user response
+        // If we've already asked recently, check if user gave unexpected response
+        const lastUserMessageSavings = conversationHistory
+          .filter(msg => msg.role === 'user')
+          .slice(-1)[0]?.content || '';
+        
+        if (lastUserMessageSavings) {
+          const adaptiveResponse = handleAdaptiveResponse(lastUserMessageSavings, 'existing_savings', extracted, conversationHistory);
+          return {
+            success: true,
+            message: `${greeting}${adaptiveResponse}`
+          };
+        }
+        
         return {
           success: true,
           message: `${greeting}I'm waiting for your existing savings information to complete the analysis.`
@@ -315,7 +1585,33 @@ Let me create your personalized investment plan...`,
 
 **Result: ❌ GOAL IS NOT ACHIEVABLE** - You'll be short by ₹${(shortfall / 100000).toFixed(1)} lakhs*
 
-Since your current capacity won't achieve this goal, let me suggest alternatives:
+Don't worry! I have several alternatives to help you achieve your goal:
+
+**Option 1: Timeline Extension**
+- Extend timeline to ${Math.ceil(timeline * 1.5)}-${Math.ceil(timeline * 2)} years
+- This would make your goal achievable with current investment capacity
+
+**Option 2: Second-hand/Pre-owned Options**
+- Consider pre-owned alternatives (cars, bikes, homes)
+- Could save 30-50% on cost while meeting your needs
+- Many excellent options available with proper verification
+
+**Option 3: Income Enhancement**
+- What's your current profession? I can suggest specific skills to increase your income
+- Side business opportunities based on your skills
+- Career advancement strategies
+
+**Option 4: Alternative Goal Modifications**
+- Consider smaller/different variants of your goal
+- Alternative locations or brands with better value
+- Phased approach - achieve part of goal first
+
+**Option 5: Financial Restructuring**
+- Optimize existing investments for better returns
+- Consider different investment strategies
+- Review and optimize monthly expenses
+
+Which option interests you most? I can provide detailed guidance on any of these.
 
 **What is your profession?** This will help me provide targeted advice.
 
@@ -607,8 +1903,8 @@ const analyzeUserInputComplexity = (
   }
 };
 
-// Function to extract and convert financial figures from user input
-const extractFinancialFigures = (userInput: string): {
+// Function to extract and convert financial figures from user input with context awareness
+const extractFinancialFigures = (userInput: string, context?: 'goal_amount' | 'income' | 'general'): {
   amount?: number;
   timeline?: number;
   monthlyInvestment?: number;
@@ -624,19 +1920,42 @@ const extractFinancialFigures = (userInput: string): {
   } = {};
   
   try {
-    // Split input into words and process each
+    const inputLower = userInput.toLowerCase();
     const words = userInput.split(/\s+/);
+    
+    // Context-aware extraction - prioritize based on what we're looking for
+    const isGoalAmountContext = context === 'goal_amount' || 
+      inputLower.includes('cost') || inputLower.includes('budget') || 
+      inputLower.includes('price') || inputLower.includes('worth') ||
+      inputLower.includes('buy') || inputLower.includes('need');
+      
+    const isIncomeContext = context === 'income' || 
+      inputLower.includes('earn') || inputLower.includes('salary') || 
+      inputLower.includes('income') || inputLower.includes('lpa') ||
+      inputLower.includes('per month') || inputLower.includes('monthly income');
     
     words.forEach((word, index) => {
       const cleanWord = word.toLowerCase().replace(/[^\w.]/g, '');
       
-      // Check for amount patterns
+      // Check for amount patterns with context awareness
       if (cleanWord.includes('lakh') || cleanWord.includes('lacs') || 
           cleanWord.includes('crore') || cleanWord.includes('crores') ||
           cleanWord.includes('thousand') || cleanWord.includes('k')) {
         const amount = convertIndianNumberFormat(word);
-        if (amount && !result.amount) {
+        if (amount) {
+          // Prioritize based on context
+          if (isIncomeContext && !result.income) {
+            result.income = amount;
+          } else if (isGoalAmountContext && !result.amount) {
+            result.amount = amount;
+          } else if (!result.amount && !result.income) {
+            // Default behavior - first amount found becomes goal amount unless it's clearly income
+            if (cleanWord.includes('lpa') || inputLower.includes('salary') || inputLower.includes('earn')) {
+              result.income = amount;
+            } else {
           result.amount = amount;
+            }
+          }
         }
       }
       
@@ -647,42 +1966,86 @@ const extractFinancialFigures = (userInput: string): {
           const value = parseFloat(numericMatch[1]);
           if (cleanWord.includes('year')) {
             result.timeline = value;
-          } else if (cleanWord.includes('month')) {
-            result.timeline = value / 12; // Convert months to years
+          } else if (cleanWord.includes('month') && !inputLower.includes('per month') && !inputLower.includes('monthly income')) {
+            result.timeline = value / 12; // Convert months to years, but not for income descriptions
           }
         }
       }
       
       // Check for monthly investment patterns
-      if (cleanWord.includes('month') || cleanWord.includes('monthly')) {
+      if ((cleanWord.includes('month') || cleanWord.includes('monthly')) && 
+          (inputLower.includes('invest') || inputLower.includes('save') || inputLower.includes('sip'))) {
         const prevWord = words[index - 1];
+        const nextWord = words[index + 1];
+        let amount = 0;
+        
         if (prevWord) {
-          const amount = convertIndianNumberFormat(prevWord);
-          if (amount) {
-            result.monthlyInvestment = amount;
-          }
+          amount = convertIndianNumberFormat(prevWord);
+        }
+        if (!amount && nextWord) {
+          amount = convertIndianNumberFormat(nextWord);
+        }
+        
+        if (amount && !result.monthlyInvestment) {
+          result.monthlyInvestment = amount;
         }
       }
       
-      // Check for income patterns
-      if (cleanWord.includes('lpa') || cleanWord.includes('salary') || cleanWord.includes('income')) {
+      // Check for income patterns with better context detection
+      if (cleanWord.includes('lpa') || 
+          (cleanWord.includes('salary') || cleanWord.includes('income')) ||
+          inputLower.includes('earn') || inputLower.includes('per month')) {
         const prevWord = words[index - 1];
+        const nextWord = words[index + 1];
+        let amount = 0;
+        
         if (prevWord) {
-          const amount = convertIndianNumberFormat(prevWord);
-          if (amount) {
-            result.income = amount;
-          }
+          amount = convertIndianNumberFormat(prevWord);
+        }
+        if (!amount && nextWord) {
+          amount = convertIndianNumberFormat(nextWord);
+        }
+        
+        if (amount && !result.income) {
+          result.income = amount;
         }
       }
     });
     
-    // Also check for standalone numbers that might be amounts
-    if (!result.amount) {
-      const standaloneNumbers = userInput.match(/(\d+(?:\.\d+)?)\s*(lakh|lacs|crore|crores|thousand|k|cr|l|t)/gi);
-      if (standaloneNumbers) {
-        const amount = convertIndianNumberFormat(standaloneNumbers[0]);
-        if (amount) {
+    // Specific patterns for goal amounts (only if not already found and context is appropriate)
+    if (!result.amount && (context === 'goal_amount' || !isIncomeContext)) {
+      const goalPatterns = [
+        /(?:cost|price|budget|worth|need|buy).*?(\d+(?:\.\d+)?)\s*(lakh|lacs|crore|crores|thousand|k|cr|l|t)/gi,
+        /(\d+(?:\.\d+)?)\s*(lakh|lacs|crore|crores|thousand|k|cr|l|t).*?(?:cost|price|budget|worth)/gi
+      ];
+      
+      for (const pattern of goalPatterns) {
+        const match = userInput.match(pattern);
+        if (match) {
+          const amount = convertIndianNumberFormat(match[0]);
+          if (amount && !result.amount) {
           result.amount = amount;
+            break;
+          }
+        }
+      }
+    }
+    
+    // Specific patterns for income (only if not already found and context is appropriate)
+    if (!result.income && (context === 'income' || !isGoalAmountContext)) {
+      const incomePatterns = [
+        /(?:earn|salary|income|lpa).*?(\d+(?:\.\d+)?)\s*(lakh|lacs|crore|crores|thousand|k|cr|l|t|lpa)/gi,
+        /(\d+(?:\.\d+)?)\s*(lakh|lacs|crore|crores|thousand|k|cr|l|t|lpa).*?(?:salary|income|earn|per year|annually)/gi
+      ];
+      
+      for (const pattern of incomePatterns) {
+        const match = userInput.match(pattern);
+        if (match) {
+          const amount = convertIndianNumberFormat(match[0]);
+          if (amount && !result.income) {
+            result.income = amount;
+            break;
+          }
         }
       }
     }
@@ -704,7 +2067,7 @@ const extractFinancialFigures = (userInput: string): {
       }
     }
     
-    console.log('Extracted financial figures:', result);
+    console.log('Extracted financial figures with context:', context, result);
     return result;
     
   } catch (error) {
@@ -741,117 +2104,221 @@ const FINANCIAL_ADVISOR_FLOW = {
   disclaimer: "\n\n*This number is indicative, kindly seek guidance from a Certified Financial Professional before taking a financial decision"
 };
 
-// Updated system instruction based on user's requirements
-const SYSTEM_INSTRUCTION = `You are InvestRight Bot, an expert financial advisor for Indian users. Your role is to guide users toward achieving their Key Life Goals through financial planning and unbiased investment advice.
+// Updated system instruction to match custom GPT prompt exactly
+const SYSTEM_INSTRUCTION = `Act as an expert financial advisor with knowledge of available investment options in India.
 
-## Communication Style
-- Friendly, professional, engaging, and educative.
-- Maintain a conversational flow, asking step-by-step questions.
-- Use simple, easy-to-understand explanations (avoid jargon unless asked).
-- Ask only essential questions to gather necessary information for investment planning.
-- Start with 5 core questions, but increase based on user input complexity and information depth needed.
-- Be adaptive - ask follow-up questions when users provide incomplete or complex information.
-- **ALWAYS provide sample answer formats** when asking questions to help users understand what kind of response is expected.
+## Welcome Message
+Start the conversation with:
+"Hi there, Welcome to InvestRight - your unbiased personal wealth advisor. I am here to help you achieve and prepare for your Key Life Goals through financial advice."
+
+Then explain Life Goal Preparedness (keep it shorter):
+"Life Goal Preparedness refers to how ready and financially equipped an individual (or family) is to achieve their key life goals — such as: Buying a house, Children's education, Marriage expenses, Retirement planning, Health & family security, Travel, lifestyle, or passion pursuits."
+
+Ask: "Are you ready to start?"
 
 ## Conversation Flow
 
-**Step 1: Welcome Message**
-Start with:
-"Hi there, Welcome to InvestRight - your unbiased personal wealth advisor. I am here to help you achieve and prepare for your Key Life Goals through financial advice."
+**Step 1: Get User's Name**
+If user agrees to start, ask for their name to address them personally.
 
-Explain briefly what Life Goal Preparedness means:
-"Life Goal Preparedness refers to how ready and financially equipped an individual (or family) is to achieve their key life goals — such as: Buying a house, Children's education, Marriage expenses, Retirement planning, Health & family security, Travel, lifestyle, or passion pursuits."
+**Step 2: Main Goal Question**
+Ask: "What inspirational life goal you have? I would love to hear from you - it could be investment advice, any goal you want to accomplish, or it could just curiosity on any investment or anything else too"
 
-Then ask:
-"Are you ready to start?"
+**Step 3: Follow-up Questions**
+- The next questions should be based on the previous answers
+- Nature of questions should be to advise or get more details as required
+- As more details become available, start providing advice
+- **Stick to maximum 5 questions before sharing advice**
 
-**Step 2: If User Agrees**
-- Ask for their name (to address them personally).
-- Ask the first question:
-"What inspirational life goal do you have? I would love to hear from you – it could be investment advice, any goal you want to accomplish, or even just curiosity on any investment or anything else too."
+**Step 4: Investment Plan Generation**
+When client seeks investment plan or way to get money for their goal, generate a report for their plan.
 
-**Step 3: Goal Discovery & Analysis (Step-by-Step Process)**
+**Step 5: Risk Assessment & Feasibility Check**
+When customer goal is clear and ready for investment options:
+1. Check user's appetite for taking risk by asking simple questions
+2. Check user income source and current profession
+3. Determine if the goal is achievable or not
+4. If goal is not achievable, suggest alternative options
 
-**3.1: Goal, Amount & Timeline Collection**
-- Ask for the specific goal, target amount, and timeline
-- If user doesn't know the goal amount, search for current market prices and provide tentative estimates
-- Use sample answer formats for all questions
+**Step 6: Income Enhancement (if needed)**
+If goals are not achieved with current investment plan:
+- Ask about user's profession
+- Suggest additional options to increase income:
+  * Upskilling opportunities
+  * Starting side business
+  * Starting new business
 
-**3.2: Income Source & Monthly Savings Assessment**
-- Ask about their current income source and profession
-- Determine their monthly savings capacity
-- Assess their financial stability and income growth potential
+## Communication Style
+- Tone should be friendly, professional, educative and engaging
+- Maintain conversational format
+- Use friendly and indirect approach
+- Provide explanations for the purpose of questions
 
-**3.3: Existing Savings & Assets Check**
-- Ask about their current savings, investments, and assets
-- Understand their existing financial foundation
-- Calculate total available resources
+## Important Rules
+1. **Maximum 5 questions** before providing advice
+2. **ROI Numbers**: Whenever generating any return on investment number, put a "*" mark beside the number
+3. **Disclaimer**: Add this line at end of any financial advice - "This number is indicative, kindly seek guidance from Certified Financial Professional before taking a financial decision"
+4. **Natural conversation**: Base each question on the previous answer
+5. **Goal-focused**: Move towards providing actionable investment advice quickly
+6. **India-specific advice**: Provide investment options available in India (mutual funds, stocks, FDs, PPF, NPS, ELSS)
+7. **Risk assessment**: Always assess user's risk appetite before suggesting investments
+8. **Feasibility check**: Determine if goals are achievable with current income and suggest alternatives if not`;
 
-**3.4: Goal Feasibility Analysis**
-- Perform detailed calculations to determine if the goal is achievable
-- Consider current savings + monthly investments + expected returns
-- Show clear mathematical breakdown of feasibility
-
-**3.5: Feasibility Decision & Next Steps**
-
-**If Goal is ACHIEVABLE:**
-- Proceed to Step 4: Investment Plan Generation
-- Provide specific investment recommendations
-- Show detailed investment strategy with asset allocation
-
-**If Goal is NOT ACHIEVABLE:**
-- Explain the reasons with clear calculations
-- Ask about their profession for targeted advice
-- Suggest alternatives:
-  * Modified goal amounts or timelines
-  * Income enhancement strategies
-  * Skill development opportunities
-  * Alternative investment approaches
-  * Side business or career advancement options
-
-**Step 4: Investment Plan Generation (Only if Goal is Achievable)**
-- Provide comprehensive investment strategy for India (mutual funds, stocks, FDs, PPF, NPS, ELSS)
-- Generate detailed investment report with specific recommendations
-- Show monthly SIP amounts and asset allocation
-- When giving return numbers, always add "*" after the number
-- End with disclaimer: "This number is indicative, kindly seek guidance from a Certified Financial Professional before taking a financial decision."
-
-**Step 5: Alternative Solutions (If Goal is Not Achievable)**
-- Provide profession-specific income enhancement strategies
-- Suggest skill development opportunities
-- Recommend alternative goal modifications
-- Offer creative solutions to bridge the gap
-
-## Rules
-1. **Follow the Step-by-Step Process**: Always follow the 5-step process (Goal Collection → Income Assessment → Savings Check → Feasibility Analysis → Plan/Alternatives).
-2. **Never Skip Steps**: Complete each step thoroughly before moving to the next.
-3. **Goal Amount Research**: If user doesn't know goal amount, search for current market prices and provide realistic estimates.
-4. **Mathematical Feasibility**: Always perform detailed calculations to determine goal achievability.
-5. **Show Your Work**: Display clear mathematical breakdowns for all calculations.
-6. **Profession-Specific Advice**: When goals are not achievable, provide targeted advice based on user's profession.
-7. **Alternative Solutions**: Always offer multiple alternatives when goals seem unachievable.
-8. **Realistic Guidance**: Never overpromise returns - use conservative estimates.
-9. **India-Specific**: Provide India-specific investment recommendations and market data.
-10. **Mark Returns**: Always mark ROI numbers with asterisk (*).
-11. **Interactive Flow**: Keep conversation engaging (ask → listen → calculate → advise).
-12. **Sample Answer Formats**: ALWAYS provide sample answer formats for all questions.
-13. **Adaptive Questioning**: Ask follow-up questions when information is incomplete.
-14. **Comprehensive Planning**: Only generate investment plans after confirming goal achievability.
-
-## Step-by-Step Process Rules
-- **Step 3.1**: Collect goal, amount, timeline - research prices if needed
-- **Step 3.2**: Assess income source and monthly savings capacity
-- **Step 3.3**: Check existing savings and assets
-- **Step 3.4**: Perform feasibility calculations with clear breakdown
-- **Step 3.5**: Make decision and proceed accordingly
-- **Step 4**: Generate investment plan only if goal is achievable
-- **Step 5**: Provide alternatives and income enhancement strategies if goal is not achievable`;
-
-// Few-shot examples to guide the model's tone and structure
-const FEW_SHOT_EXAMPLES = `### Few-Shot Examples
+// Simplified examples aligned with custom GPT prompt approach  
+const FEW_SHOT_EXAMPLES = `### Conversation Examples (Max 5 Questions)
 
 ---
-**Example 1: Step-by-Step Process - Child Education (Goal Achievable)**
+**Example 1: House Purchase Goal**
+
+**Step 3.1: Natural Goal Collection**
+User: I've always dreamed of owning a luxury SUV. I really want to get an Audi Q7 because it's my dream car and I think it would be perfect for my family.
+Bot: That's wonderful! Having a dream car that meets your family's needs is a great goal. What's your target budget for this Audi Q7 purchase?
+
+Sample format:
+• "Around ₹85 lakhs"
+• "Between ₹80-90 lakhs"
+• "I'm not sure about the exact amount"
+
+User: I'm not sure about the exact amount.
+Bot: No worries! Let me help you with some rough estimates. Audi Q7 typically ranges from ₹85 lakhs to ₹1.10 crores depending on the variant. For basic calculation, let's consider:
+
+• **Base Model**: ₹85-90 lakhs
+• **Mid Variant**: ₹95 lakhs - ₹1 crore  
+• **Top Model**: ₹1-1.10 crores
+
+Which range feels comfortable for your planning?
+
+User: Still not sure, can you help me with exact pricing?
+Bot: Absolutely! Let me search for current market pricing to give you accurate information.
+
+[Web Search Results]
+Based on current market research, here's what I found about Audi Q7:
+
+The Audi Q7 2024 is priced between ₹85.29 lakhs to ₹1.10 crores (ex-showroom) in India, depending on the variant. The base model starts at ₹85.29 lakhs, while the top-end variant can go up to ₹1.10 crores.
+
+Source: CarWale.com
+
+This gives us a good starting point for your financial planning. Would you like to proceed with this estimate, or do you have a more specific budget in mind?
+
+User: I'm looking at the base model, so around 85 lakhs.
+Bot: Perfect! ₹85 lakhs for the base model Audi Q7 is a realistic target. Now, what's your timeline for this purchase?
+
+Sample format:
+• "2 years" or "3 years"
+• "I want to buy it in 18 months"
+• "Planning for next year"
+
+User: I want to buy it in 3 years.
+Bot: Excellent! So we're planning for ₹85 lakhs in 3 years. Now let me understand your financial capacity:
+
+What is your current monthly income and how much can you invest monthly towards this goal?
+
+Sample format:
+• "₹1.5 lakhs per month, can invest ₹50,000"
+• "I earn ₹20 LPA, can save ₹60,000 monthly"
+• "Monthly income ₹2 lakhs, investment capacity ₹70,000"
+
+---
+**Example 2: Natural Goal Expression - House Purchase**
+
+**Step 3.1: Natural Goal Collection** 
+User: My wife and I have been renting for years and we're tired of it. We want to own our own place where we can raise our kids and have a garden. It's been our dream for so long.
+Bot: That's a beautiful dream! Having your own home where you can build memories with your family is truly special. What's your target budget for this house purchase?
+
+Sample format:
+• "₹50 lakhs in 5 years"
+• "Around ₹1 crore, need it in 3 years"
+• "Not sure about budget, want it soon"
+
+**Example 3: Adaptive Response Handling - Unexpected User Reply**
+
+**Step 3.1: Goal Collection with Unexpected Response**
+User: I want to buy a house.
+Bot: Great! A house is a significant investment. What's your target budget for this purchase?
+
+Sample format:
+• "₹50 lakhs in 5 years"
+• "Around ₹1 crore, need it in 3 years"
+• "Not sure about budget, want it soon"
+
+User: I don't know about budget, but I need it urgently because my family is growing.
+
+Bot: I understand your urgency! Family growth is an important factor. Let me help you find current house prices in your area to set a realistic budget. What city or area are you looking at?
+
+Sample format:
+• "Mumbai, preferably Andheri"
+• "Delhi, near metro stations"
+• "Bangalore, IT corridor"
+
+User: Mumbai, but I'm not sure about the area yet.
+
+Bot: Perfect! Mumbai has various options. Let me search for current property prices in different areas of Mumbai to help you decide.
+
+[Web Search Results]
+Based on current market research, here's what I found about Mumbai property prices:
+
+Mumbai property prices range from ₹8,000-15,000 per sq ft in suburbs to ₹25,000-50,000+ per sq ft in prime areas. For a 2BHK (800-1000 sq ft), this translates to ₹65 lakhs to ₹5 crores depending on location.
+
+Source: 99acres.com
+
+This gives us a good starting point. What's your preferred area type - suburbs for affordability or prime areas for convenience?
+
+---
+**Example 3: Alternative Solutions for Unfeasible Goal**
+
+**Step 3.4: Feasibility Analysis - Goal Not Achievable**
+Bot: Let me calculate if your goal is achievable:
+
+**Current Resources:**
+• Existing Savings: ₹2 lakhs
+• Monthly Investment: ₹15,000
+• Timeline: 3 years
+• Expected Returns: 10%* annually
+
+**Calculation:**
+• Future Value of ₹2 lakhs in 3 years: ₹2.66 lakhs*
+• Future Value of ₹15,000 monthly SIP: ₹6.18 lakhs*
+• **Total Accumulation: ₹8.84 lakhs***
+
+**Result: ❌ GOAL NOT ACHIEVABLE** - You need ₹91.16 lakhs* more.
+
+**Step 5: Alternative Solutions**
+Bot: I understand this is challenging, but don't worry! Let me suggest several alternatives to help you achieve your goal:
+
+**Option 1: Timeline Extension**
+- Extend timeline to 7-8 years to make it achievable
+- This would require ₹25,000-30,000 monthly investment
+
+**Option 2: Second-hand Property**
+- Consider pre-owned properties in the same area
+- Could save 30-40% on cost (₹60-80 lakhs instead of ₹1 crore)
+- Many good options available with proper verification
+
+**Option 3: Income Enhancement**
+- What's your current profession? I can suggest specific skills to increase your income
+- Side business opportunities based on your skills
+- Career advancement strategies
+
+**Option 4: Alternative Locations**
+- Consider nearby areas with better price-to-value ratio
+- Emerging localities with good connectivity
+- Could reduce cost by 20-30%
+
+Which option interests you most? I can provide detailed guidance on any of these.
+
+---
+**Example 4: Natural Goal Expression - Child Education**
+
+**Step 3.1: Natural Goal Collection**
+User: My daughter is 8 years old and she's so bright. I want to make sure she can go to the best college when she grows up, maybe even study abroad if that's what she wants. Education is so expensive these days and I don't want money to be a barrier for her dreams.
+Bot: What a loving parent you are! Ensuring your daughter has access to quality education is one of the most valuable gifts you can give her. What's your target budget for her education expenses?
+
+Sample format:
+• "Around ₹25 lakhs for her college"
+• "₹50 lakhs including international options"
+• "I'm not sure about the exact costs"
+
+**Example 5: Step-by-Step Process - Goal Amount Already Mentioned**
 
 **Step 3.1: Goal Collection**
 User: I want to save for my child's education in 10 years. I think it will cost 25 lakhs.
@@ -877,8 +2344,13 @@ Sample format:
 
 User: I have ₹3 lakhs in FDs and ₹2 lakhs in mutual funds.
 
-**Step 3.4: Feasibility Analysis**
-Bot: Let me calculate if your goal is achievable:
+**Step 3.4: Four-Area Feasibility Analysis**
+Bot: Let me perform a comprehensive feasibility analysis considering all four critical areas:
+
+**1. Goal Amount**: ₹25 lakhs (Child's education)
+**2. Timeline**: 10 years
+**3. Income Sources**: ₹8 LPA (₹67,000 monthly)
+**4. Monthly Savings Capacity**: ₹20,000 towards this goal
 
 **Current Resources:**
 • Existing Savings: ₹5 lakhs
@@ -886,10 +2358,16 @@ Bot: Let me calculate if your goal is achievable:
 • Timeline: 10 years
 • Expected Returns: 10%* annually
 
-**Calculation:**
+**Detailed Calculation:**
 • Future Value of ₹5 lakhs in 10 years: ₹12.97 lakhs*
 • Future Value of ₹20,000 monthly SIP: ₹20.48 lakhs*
 • **Total Accumulation: ₹33.45 lakhs***
+
+**Feasibility Analysis:**
+• **Required**: ₹25 lakhs
+• **Projected**: ₹33.45 lakhs*
+• **Surplus**: ₹8.45 lakhs*
+• **Success Rate**: 133%* (Goal fully achievable)
 
 **Result: ✅ GOAL IS ACHIEVABLE!** You'll have ₹8.45 lakhs* more than needed.
 
@@ -1318,13 +2796,13 @@ export const sendChatMessageToGemini = async (
     console.log('ChatbotService: Current state - Conversation length:', conversationHistory.length, 'Question count:', questionCount, 'Authenticated:', userInfo?.isAuthenticated);
     
     // Extract financial figures and check what information we have
-    const extractedInfo = extractFinancialFigures(userMessage);
+    const extractedInfo = extractFinancialFigures(userMessage, 'general');
     const hasGoal = conversationHistory.some(msg => msg.role === 'user' && msg.content.length > 10);
     const hasFinancialInfo = extractedInfo.amount || extractedInfo.timeline || extractedInfo.monthlyInvestment || extractedInfo.income;
     
     // Analyze all conversation to see if we have enough information
     const allUserMessages = conversationHistory.filter(msg => msg.role === 'user').map(msg => msg.content).join(' ');
-    const allExtracted = extractFinancialFigures(allUserMessages);
+    const allExtracted = extractFinancialFigures(allUserMessages, 'general');
     const hasGoalInfo = conversationHistory.some(msg => msg.role === 'user' && (msg.content.includes('goal') || msg.content.includes('want') || msg.content.includes('need')));
     const hasFinancialData = allExtracted.amount || allExtracted.income || allExtracted.monthlyInvestment;
     
@@ -1398,35 +2876,31 @@ export const sendChatMessageToGemini = async (
     if (conversationHistory.length >= (userInfo?.isAuthenticated ? 3 : 4)) {
       console.log('ChatbotService: Following step-by-step process for goal analysis');
       
+      try {
       // Analyze what information we have and what step we're on
       const allUserMessages = conversationHistory.filter(msg => msg.role === 'user').map(msg => msg.content).join(' ');
-      const allExtracted = extractFinancialFigures(allUserMessages);
+      const allExtracted = extractFinancialFigures(allUserMessages, 'general');
       
-      // Check if we've been asking the same question too many times
-      const recentAssistantMessages = conversationHistory
-        .filter(msg => msg.role === 'assistant')
-        .slice(-5) // Check last 5 assistant messages
-        .map(msg => msg.content.toLowerCase());
-      
-      const hasRepeatedQuestion = recentAssistantMessages.length >= 3 && 
-        recentAssistantMessages.every(msg => 
-          msg.includes('target amount') || 
-          msg.includes('timeline') || 
-          msg.includes('income') || 
-          msg.includes('existing')
-        );
-      
-      if (hasRepeatedQuestion) {
-        console.log('ChatbotService: Detected repeated questions, moving to feasibility analysis');
-        return await performFeasibilityAnalysis(conversationHistory, allExtracted, userInfo);
-      }
-      
-      // Determine current step based on conversation history
-      const currentStep = determineCurrentStep(conversationHistory, allExtracted);
-      console.log('ChatbotService: Current step:', currentStep);
+        console.log('ChatbotService: Extracted information:', allExtracted);
+        console.log('ChatbotService: All user messages:', allUserMessages);
+        
+        // Use the determineCurrentStep function to get the next step
+        const nextStep = determineCurrentStep(conversationHistory, allExtracted, userInfo);
+        
+        console.log('ChatbotService: Determined next step:', nextStep);
       
       // Generate appropriate question based on current step
-      return await generateStepBasedQuestion(currentStep, conversationHistory, allExtracted, userInfo);
+        return await generateStepBasedQuestion(nextStep, conversationHistory, allExtracted, userInfo);
+        
+      } catch (error) {
+        console.error('ChatbotService: Error in step-by-step processing:', error);
+        
+        // Fallback to simple response
+        return {
+          success: true,
+          message: `${greeting}I'm here to help you with your financial planning! Could you tell me about your goal? For example, what would you like to save money for?`
+        };
+      }
     }
 
     // Default fallback
@@ -1587,7 +3061,7 @@ const generateRelevantQuestion = async (
     
     // Analyze conversation to track what information has been collected
     const allUserMessages = conversationHistory.filter(msg => msg.role === 'user').map(msg => msg.content).join(' ');
-    const allExtracted = extractFinancialFigures(allUserMessages);
+    const allExtracted = extractFinancialFigures(allUserMessages, 'general');
     
     // Track what information has been collected to avoid repetitive questions
     const collectedInfo = {
@@ -1834,7 +3308,7 @@ const generateFinancialAdvice = async (
         }
         
         // Extract financial figures from user messages
-        const figures = extractFinancialFigures(msg.content);
+        const figures = extractFinancialFigures(msg.content, 'general');
         if (figures.amount && !extractedFigures.amount) extractedFigures.amount = figures.amount;
         if (figures.timeline && !extractedFigures.timeline) extractedFigures.timeline = figures.timeline;
         if (figures.monthlyInvestment && !extractedFigures.monthlyInvestment) extractedFigures.monthlyInvestment = figures.monthlyInvestment;
@@ -1990,7 +3464,7 @@ Generate a comprehensive financial plan with goal cost analysis, feasibility ass
     
     // Create a more comprehensive fallback advice
     const allConversationText = conversationHistory.filter(msg => msg.role === 'user').map(msg => msg.content).join(' ');
-    const comprehensiveExtracted = extractFinancialFigures(allConversationText);
+    const comprehensiveExtracted = extractFinancialFigures(allConversationText, 'general');
     
     console.log('generateFinancialAdvice: Comprehensive extracted for fallback:', comprehensiveExtracted);
     console.log('generateFinancialAdvice: All conversation text:', allConversationText);
@@ -2370,7 +3844,7 @@ export const testIndianNumberConversion = (): void => {
   
   console.log('\nTesting financial figure extraction:');
   const testInput = 'I want to save 25 lakhs in 10 years and can invest 10k per month. I earn 8 LPA.';
-  const extracted = extractFinancialFigures(testInput);
+  const extracted = extractFinancialFigures(testInput, 'general');
   console.log(`Input: "${testInput}"`);
   console.log('Extracted:', extracted);
 };
