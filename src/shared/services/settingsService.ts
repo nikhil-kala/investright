@@ -1,6 +1,7 @@
 import { UserSettings, SettingsFormData, SettingsResponse } from '../types';
 import { SETTINGS_CONFIG } from '../constants';
 import { getStorageAdapter } from './webStorageAdapter';
+import { apiFetch, useLaravelApi } from '../../lib/apiClient';
 
 class SettingsService {
   private baseUrl: string;
@@ -11,6 +12,18 @@ class SettingsService {
 
   // Get user settings
   async getUserSettings(userId: number): Promise<SettingsResponse> {
+    if (useLaravelApi()) {
+      try {
+        return await apiFetch<SettingsResponse>('/settings');
+      } catch (error) {
+        return {
+          success: false,
+          message: 'Failed to retrieve settings',
+          error: error instanceof Error ? error.message : 'Unknown error',
+        };
+      }
+    }
+
     try {
       const storage = getStorageAdapter();
       const storageKey = `user_settings_${userId}`;
@@ -43,6 +56,21 @@ class SettingsService {
 
   // Update user settings
   async updateUserSettings(userId: number, formData: SettingsFormData): Promise<SettingsResponse> {
+    if (useLaravelApi()) {
+      try {
+        return await apiFetch<SettingsResponse>('/settings', {
+          method: 'PUT',
+          body: JSON.stringify(formData),
+        });
+      } catch (error) {
+        return {
+          success: false,
+          message: 'Failed to update settings',
+          error: error instanceof Error ? error.message : 'Unknown error',
+        };
+      }
+    }
+
     try {
       const settings: UserSettings = {
         id: Date.now(),

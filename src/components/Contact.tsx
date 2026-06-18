@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useLanguage } from '../hooks/useLanguage';
 import { translations } from '../data/translations';
 import { MapPin, Mail, Clock, Send } from 'lucide-react';
+import { apiFetch, useLaravelApi } from '../lib/apiClient';
 
 const Contact: React.FC = () => {
   console.log('Contact component rendering...');
@@ -23,13 +24,22 @@ const Contact: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
-    
-    // Simulate form submission
-    setTimeout(() => {
-      setIsSubmitting(false);
+
+    try {
+      if (useLaravelApi()) {
+        await apiFetch('/contact', {
+          method: 'POST',
+          body: JSON.stringify(formData),
+        });
+      }
+
       alert('Thank you for your message! We will get back to you soon.');
       setFormData({ name: '', email: '', subject: '', message: '' });
-    }, 1000);
+    } catch {
+      alert('Failed to send message. Please try again later.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {

@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabase';
+import { apiFetch, useLaravelApi } from '../lib/apiClient';
 
 export interface ChatMessage {
   id?: number;
@@ -32,6 +33,27 @@ export interface ConversationSummary {
 class ChatService {
   // Store a new message in Supabase
   async storeMessage(message: Omit<ChatMessage, 'id'>): Promise<{ success: boolean; messageId?: number; error?: string }> {
+    if (useLaravelApi()) {
+      try {
+        const data = await apiFetch<{ success: boolean; messageId?: number; error?: string }>('/chat/messages', {
+          method: 'POST',
+          body: JSON.stringify({
+            user_email: message.user_email,
+            message_text: message.message_text,
+            sender: message.sender,
+            conversation_id: message.conversation_id,
+            timestamp: message.timestamp.toISOString(),
+          }),
+        });
+        return data;
+      } catch (error) {
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : 'Unknown error',
+        };
+      }
+    }
+
     try {
       if (!supabase) {
         throw new Error('Supabase not configured');
@@ -66,6 +88,31 @@ class ChatService {
 
   // Store a complete conversation in Supabase
   async storeConversation(conversation: Omit<ChatConversation, 'id'>): Promise<{ success: boolean; conversationId?: string; error?: string }> {
+    if (useLaravelApi()) {
+      try {
+        const data = await apiFetch<{ success: boolean; conversationId?: string; error?: string }>('/chat/conversations', {
+          method: 'POST',
+          body: JSON.stringify({
+            user_email: conversation.user_email,
+            title: conversation.title,
+            summary: conversation.summary,
+            message_count: conversation.message_count,
+            messages: conversation.messages.map(m => ({
+              message_text: m.message_text,
+              sender: m.sender,
+              timestamp: m.timestamp.toISOString(),
+            })),
+          }),
+        });
+        return data;
+      } catch (error) {
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : 'Unknown error',
+        };
+      }
+    }
+
     try {
       if (!supabase) {
         throw new Error('Supabase not configured');
@@ -112,6 +159,27 @@ class ChatService {
 
   // Get all conversations for a user
   async getUserConversations(userEmail: string): Promise<{ success: boolean; conversations?: ConversationSummary[]; error?: string }> {
+    if (useLaravelApi()) {
+      try {
+        const data = await apiFetch<{ success: boolean; conversations: ConversationSummary[] }>(
+          `/chat/conversations?user_email=${encodeURIComponent(userEmail)}`
+        );
+        return {
+          success: true,
+          conversations: data.conversations.map(c => ({
+            ...c,
+            created_at: new Date(c.created_at),
+            last_message_at: new Date(c.last_message_at),
+          })),
+        };
+      } catch (error) {
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : 'Unknown error',
+        };
+      }
+    }
+
     try {
       if (!supabase) {
         throw new Error('Supabase not configured');
@@ -223,6 +291,32 @@ class ChatService {
 
   // Get full conversation with messages
   async getConversation(conversationId: string, userEmail: string): Promise<{ success: boolean; conversation?: ChatConversation; error?: string }> {
+    if (useLaravelApi()) {
+      try {
+        const data = await apiFetch<{ success: boolean; conversation: ChatConversation }>(
+          `/chat/conversations/${encodeURIComponent(conversationId)}`
+        );
+        const conv = data.conversation;
+        return {
+          success: true,
+          conversation: {
+            ...conv,
+            created_at: new Date(conv.created_at),
+            last_message_at: new Date(conv.last_message_at),
+            messages: conv.messages.map(m => ({
+              ...m,
+              timestamp: new Date(m.timestamp),
+            })),
+          },
+        };
+      } catch (error) {
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : 'Unknown error',
+        };
+      }
+    }
+
     try {
       if (!supabase) {
         throw new Error('Supabase not configured');
@@ -355,6 +449,25 @@ class ChatService {
 
   // Admin method: Get all conversations from all users
   async getAllConversations(): Promise<{ success: boolean; conversations?: any[]; error?: string }> {
+    if (useLaravelApi()) {
+      try {
+        const data = await apiFetch<{ success: boolean; conversations: any[] }>('/chat/admin/conversations');
+        return {
+          success: true,
+          conversations: data.conversations.map(c => ({
+            ...c,
+            created_at: new Date(c.created_at),
+            last_message_at: new Date(c.last_message_at),
+          })),
+        };
+      } catch (error) {
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : 'Unknown error',
+        };
+      }
+    }
+
     try {
       if (!supabase) {
         throw new Error('Supabase not configured');
@@ -447,6 +560,17 @@ class ChatService {
 
   // Admin method: Get conversation stats
   async getConversationStats(): Promise<{ success: boolean; stats?: any; error?: string }> {
+    if (useLaravelApi()) {
+      try {
+        return await apiFetch('/chat/stats');
+      } catch (error) {
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : 'Unknown error',
+        };
+      }
+    }
+
     try {
       if (!supabase) {
         throw new Error('Supabase not configured');

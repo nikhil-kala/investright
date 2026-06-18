@@ -8,7 +8,11 @@
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "start": "node server.js"
+    "start": "node server.js",
+    "api": "cd backend && C:\\xampp\\php\\php.exe artisan serve --host=127.0.0.1 --port=8000",
+    "api:migrate": "cd backend && C:\\xampp\\php\\php.exe artisan migrate",
+    "api:seed": "cd backend && C:\\xampp\\php\\php.exe artisan db:seed",
+    "api:fresh": "cd backend && C:\\xampp\\php\\php.exe artisan migrate:fresh --seed"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",

@@ -1,6 +1,6 @@
 // Expert Financial Advisor Chatbot Service for InvestRight
-import { GoogleGenerativeAI } from "@google/generative-ai";
 import { webSearchService } from './webSearchService';
+import { isOpenAIConfigured, sendOpenAIPrompt } from './openaiService';
 
 // Interface to track goal details for progressive questioning
 interface GoalDetails {
@@ -2658,13 +2658,11 @@ export const sendChatMessageToGemini = async (
       console.log('ChatbotService: Extracted userName from current message:', userName);
     }
     
-    const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
-    
-    if (!apiKey || apiKey === 'your-gemini-api-key-here') {
+    if (!isOpenAIConfigured()) {
       console.log('ChatbotService: API key not configured');
       return {
         success: false,
-        message: 'API key not configured. Please set your Gemini API key in the environment variables.'
+        message: 'API key not configured. Please set your OpenAI API key in the environment variables.'
       };
     }
 
@@ -3035,13 +3033,11 @@ const generateRelevantQuestion = async (
   userInfo?: { username?: string; isAuthenticated?: boolean }
 ): Promise<{ success: boolean; message: string; isGeneratingPlan?: boolean }> => {
   try {
-    const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
-    
-    if (!apiKey || apiKey === 'your-gemini-api-key-here') {
-      console.error('Gemini API key not configured for question generation');
+    if (!isOpenAIConfigured()) {
+      console.error('OpenAI API key not configured for question generation');
       return {
         success: false,
-        message: 'API key not configured. Please set your Gemini API key in the environment variables.'
+        message: 'API key not configured. Please set your OpenAI API key in the environment variables.'
       };
     }
     
@@ -3174,15 +3170,8 @@ const generateRelevantQuestion = async (
       };
     }
     
-    // Use Google Generative AI for dynamic question generation
+    // Use OpenAI for dynamic question generation
     try {
-      const genAI = new GoogleGenerativeAI(apiKey);
-      const model = genAI.getGenerativeModel({
-        model: "gemini-2.5-pro"
-      });
-
-      const chat = model.startChat();
-      
       const prompt = `${SYSTEM_INSTRUCTION}
 
 ${FEW_SHOT_EXAMPLES}
@@ -3197,17 +3186,15 @@ ${conversationHistory.map(msg => `${msg.role}: ${msg.content}`).join('\n')}
 
 Generate ONE specific, relevant question that gathers essential information for investment planning:`;
 
-      const result = await chat.sendMessage(prompt);
-      const response = await result.response;
-      const question = response.text().trim();
+      const question = await sendOpenAIPrompt(prompt);
       
-      console.log('Generated relevant question using Google AI successfully');
+      console.log('Generated relevant question using OpenAI successfully');
       return {
         success: true,
         message: question
       };
     } catch (aiError) {
-      console.error('Error using Google AI for question generation:', aiError);
+      console.error('Error using OpenAI for question generation:', aiError);
       // Fall through to fallback questions
     }
     
@@ -3249,13 +3236,11 @@ const generateFinancialAdvice = async (
   conversationHistory: Array<{ role: 'user' | 'assistant', content: string }>
 ): Promise<{ success: boolean; message: string }> => {
   try {
-    const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
-    
-    if (!apiKey || apiKey === 'your-gemini-api-key-here') {
-      console.error('Gemini API key not configured');
+    if (!isOpenAIConfigured()) {
+      console.error('OpenAI API key not configured');
       return {
         success: false,
-        message: 'API key not configured. Please set your Gemini API key in the environment variables.'
+        message: 'API key not configured. Please set your OpenAI API key in the environment variables.'
       };
     }
     
@@ -3318,19 +3303,11 @@ const generateFinancialAdvice = async (
     
     console.log('Extracted financial figures from conversation:', extractedFigures);
     
-    // Use Google Generative AI for comprehensive financial advice
+    // Use OpenAI for comprehensive financial advice
     try {
-      console.log('======== GOOGLE AI GENERATION START ========');
-      console.log('generateFinancialAdvice: Starting Google AI call...');
-      console.log('generateFinancialAdvice: API Key configured:', !!apiKey);
+      console.log('======== OPENAI GENERATION START ========');
+      console.log('generateFinancialAdvice: Starting OpenAI call...');
       console.log('generateFinancialAdvice: Extracted figures for prompt:', extractedFigures);
-      
-      const genAI = new GoogleGenerativeAI(apiKey);
-      const model = genAI.getGenerativeModel({
-        model: "gemini-2.5-pro"
-      });
-
-      const chat = model.startChat();
       
       const prompt = `${SYSTEM_INSTRUCTION}
 
@@ -3417,49 +3394,46 @@ ${conversationHistory.map(msg => `${msg.role}: ${msg.content}`).join('\n')}
 
 Generate a comprehensive financial plan with goal cost analysis, feasibility assessment, and investment strategy using ALL the user inputs provided above:`;
 
-      console.log('generateFinancialAdvice: Sending request to Google AI with prompt length:', prompt.length);
+      console.log('generateFinancialAdvice: Sending request to OpenAI with prompt length:', prompt.length);
       console.log('generateFinancialAdvice: Conversation history length:', conversationHistory.length);
-      console.log('generateFinancialAdvice: Extracted figures being sent to Gemini:', extractedFigures);
-      console.log('generateFinancialAdvice: User profile being sent to Gemini:', { userName, goalDescription, riskAppetite });
+      console.log('generateFinancialAdvice: Extracted figures being sent to OpenAI:', extractedFigures);
+      console.log('generateFinancialAdvice: User profile being sent to OpenAI:', { userName, goalDescription, riskAppetite });
       console.log('generateFinancialAdvice: First 500 characters of prompt:', prompt.substring(0, 500));
       
-      console.log('generateFinancialAdvice: Calling Gemini API...');
-      const result = await chat.sendMessage(prompt);
-      console.log('generateFinancialAdvice: Gemini API call completed, processing response...');
+      console.log('generateFinancialAdvice: Calling OpenAI API...');
+      const advice = await sendOpenAIPrompt(prompt);
+      console.log('generateFinancialAdvice: OpenAI API call completed, processing response...');
       
-      const response = await result.response;
-      const advice = response.text().trim();
-      
-      console.log('======== GOOGLE AI GENERATION RESPONSE ========');
-      console.log('generateFinancialAdvice: Generated financial advice using Google AI, length:', advice.length);
+      console.log('======== OPENAI GENERATION RESPONSE ========');
+      console.log('generateFinancialAdvice: Generated financial advice using OpenAI, length:', advice.length);
       console.log('generateFinancialAdvice: First 200 characters of advice:', advice.substring(0, 200));
       console.log('generateFinancialAdvice: Last 200 characters of advice:', advice.substring(advice.length - 200));
       
       // Check if the advice is empty or too short
       if (!advice || advice.length < 50) {
-        console.log('======== GOOGLE AI RETURNED EMPTY/SHORT RESPONSE ========');
+        console.log('======== OPENAI RETURNED EMPTY/SHORT RESPONSE ========');
         console.log('generateFinancialAdvice: Advice is empty or too short, falling back to fallback advice');
         console.log('generateFinancialAdvice: Advice content:', JSON.stringify(advice));
-        throw new Error('Empty or insufficient response from Gemini API');
+        throw new Error('Empty or insufficient response from OpenAI API');
       }
       
-      console.log('======== GOOGLE AI GENERATION SUCCESS ========');
+      console.log('======== OPENAI GENERATION SUCCESS ========');
       return {
         success: true,
         message: advice + FINANCIAL_ADVISOR_FLOW.disclaimer
       };
     } catch (aiError) {
-      console.error('======== GOOGLE AI GENERATION ERROR ========');
-      console.error('generateFinancialAdvice: Error using Google AI for financial advice:', aiError);
+      console.error('======== OPENAI GENERATION ERROR ========');
+      console.error('generateFinancialAdvice: Error using OpenAI for financial advice:', aiError);
       console.error('generateFinancialAdvice: Error message:', (aiError as any)?.message || 'Unknown error');
       console.error('generateFinancialAdvice: Error details:', JSON.stringify(aiError, null, 2));
       console.error('generateFinancialAdvice: Error stack:', (aiError as any)?.stack);
       // Fall through to fallback advice
     }
     
-    // Provide fallback advice if Google AI fails
+    // Provide fallback advice if OpenAI fails
     console.log('======== USING FALLBACK ADVICE ========');
-    console.log('generateFinancialAdvice: Using fallback advice due to Google AI failure');
+    console.log('generateFinancialAdvice: Using fallback advice due to OpenAI failure');
     console.log('generateFinancialAdvice: Extracted info for fallback:', { goalDescription, timeline, cost, riskAppetite, extractedFigures });
     
     // Create a more comprehensive fallback advice
@@ -3658,24 +3632,15 @@ export const sendStoredInputsToGemini = async (
   storedInputs: ReturnType<typeof storeUserInputsTemporarily>
 ): Promise<{ success: boolean; message: string }> => {
   try {
-    const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
-    
-    if (!apiKey || apiKey === 'your-gemini-api-key-here') {
-      console.error('Gemini API key not configured');
+    if (!isOpenAIConfigured()) {
+      console.error('OpenAI API key not configured');
       return {
         success: false,
-        message: 'API key not configured. Please set your Gemini API key in the environment variables.'
+        message: 'API key not configured. Please set your OpenAI API key in the environment variables.'
       };
     }
     
-    console.log('sendStoredInputsToGemini: Starting Gemini API call with stored inputs...');
-    
-    const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({
-      model: "gemini-2.5-pro"
-    });
-
-    const chat = model.startChat();
+    console.log('sendStoredInputsToGemini: Starting OpenAI API call with stored inputs...');
     
     const greeting = storedInputs.userName ? `${storedInputs.userName}, ` : '';
     
@@ -3750,12 +3715,10 @@ Rules:
 
 Generate a comprehensive financial plan with goal cost analysis, feasibility assessment, and investment strategy using ALL the stored user inputs provided above:`;
 
-    console.log('sendStoredInputsToGemini: Sending request to Gemini with prompt length:', prompt.length);
+    console.log('sendStoredInputsToGemini: Sending request to OpenAI with prompt length:', prompt.length);
     console.log('sendStoredInputsToGemini: Stored inputs being sent:', storedInputs);
     
-    const result = await chat.sendMessage(prompt);
-    const response = await result.response;
-    const advice = response.text().trim();
+    const advice = await sendOpenAIPrompt(prompt);
     
     console.log('sendStoredInputsToGemini: Generated financial advice successfully, length:', advice.length);
     

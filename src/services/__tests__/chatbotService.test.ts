@@ -7,7 +7,7 @@ describe('Chatbot Service', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     // Reset environment variable
-    delete import.meta.env.VITE_GEMINI_API_KEY;
+    delete import.meta.env.VITE_OPENAI_API_KEY;
   });
 
   it('should return error when API key is missing', async () => {
@@ -19,7 +19,7 @@ describe('Chatbot Service', () => {
 
   it('should handle successful chat response', async () => {
     // Mock environment variable
-    import.meta.env.VITE_GEMINI_API_KEY = 'test-api-key';
+    import.meta.env.VITE_OPENAI_API_KEY = 'test-api-key';
 
     // Mock successful fetch response
     (global.fetch as jest.Mock).mockResolvedValueOnce({
@@ -48,7 +48,7 @@ describe('Chatbot Service', () => {
 
   it('should include user message in the prompt', async () => {
     // Mock environment variable
-    import.meta.env.VITE_GEMINI_API_KEY = 'test-api-key';
+    import.meta.env.VITE_OPENAI_API_KEY = 'test-api-key';
 
     // Mock successful fetch response
     (global.fetch as jest.Mock).mockResolvedValueOnce({
@@ -73,7 +73,7 @@ describe('Chatbot Service', () => {
 
   it('should handle API errors', async () => {
     // Mock environment variable
-    import.meta.env.VITE_GEMINI_API_KEY = 'test-api-key';
+    import.meta.env.VITE_OPENAI_API_KEY = 'test-api-key';
 
     // Mock error response
     (global.fetch as jest.Mock).mockResolvedValueOnce({
@@ -91,7 +91,7 @@ describe('Chatbot Service', () => {
 
   it('should handle network errors', async () => {
     // Mock environment variable
-    import.meta.env.VITE_GEMINI_API_KEY = 'test-api-key';
+    import.meta.env.VITE_OPENAI_API_KEY = 'test-api-key';
 
     // Mock network error
     (global.fetch as jest.Mock).mockRejectedValueOnce(new Error('Network error'));
@@ -104,7 +104,7 @@ describe('Chatbot Service', () => {
 
   it('should handle HTTP errors', async () => {
     // Mock environment variable
-    import.meta.env.VITE_GEMINI_API_KEY = 'test-api-key';
+    import.meta.env.VITE_OPENAI_API_KEY = 'test-api-key';
 
     // Mock HTTP error
     (global.fetch as jest.Mock).mockResolvedValueOnce({

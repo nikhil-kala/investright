@@ -1,6 +1,7 @@
 import { CreditCard, CreditCardFormData, CreditCardResponse, CreditCardListResponse } from '../types';
 import { CREDIT_CARD_CONFIG } from '../constants';
 import { getStorageAdapter } from './webStorageAdapter';
+import { apiFetch, useLaravelApi } from '../../lib/apiClient';
 
 class CreditCardService {
   private baseUrl: string;
@@ -11,6 +12,18 @@ class CreditCardService {
 
   // Get all credit cards for a user
   async getUserCreditCards(userId: number): Promise<CreditCardListResponse> {
+    if (useLaravelApi()) {
+      try {
+        return await apiFetch<CreditCardListResponse>('/credit-cards');
+      } catch (error) {
+        return {
+          success: false,
+          message: 'Failed to retrieve credit cards',
+          error: error instanceof Error ? error.message : 'Unknown error',
+        };
+      }
+    }
+
     try {
       // In a real app, this would make an API call
       // For now, we'll simulate with storage
@@ -43,6 +56,20 @@ class CreditCardService {
 
   // Add a new credit card
   async addCreditCard(userId: number, cardData: CreditCardFormData): Promise<CreditCardResponse> {
+    if (useLaravelApi()) {
+      try {
+        return await apiFetch<CreditCardResponse>('/credit-cards', {
+          method: 'POST',
+          body: JSON.stringify(cardData),
+        });
+      } catch (error) {
+        return {
+          success: false,
+          message: error instanceof Error ? error.message : 'Failed to add credit card',
+        };
+      }
+    }
+
     try {
       // Validate card data
       const validation = this.validateCardData(cardData);

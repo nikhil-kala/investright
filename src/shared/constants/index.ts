@@ -14,7 +14,7 @@ export const API_ENDPOINTS = {
   chat: {
     messages: '/chat/messages',
     conversations: '/chat/conversations',
-    send: '/chat/send',
+    send: '/chat/gemini',
   },
 } as const;
 

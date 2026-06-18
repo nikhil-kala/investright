@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabase';
+import { apiFetch, useLaravelApi } from '../lib/apiClient';
 
 export interface User {
   id: number;
@@ -52,6 +53,10 @@ class AuthService {
 
   // Login user
   async login(credentials: LoginCredentials): Promise<AuthResponse> {
+    if (useLaravelApi()) {
+      return this.loginViaLaravel(credentials);
+    }
+
     try {
       // First, try localStorage authentication for demo accounts
       const localStorageUser = this.authenticateFromLocalStorage(credentials);
@@ -195,6 +200,10 @@ class AuthService {
 
   // Logout user
   async logout(): Promise<AuthResponse> {
+    if (useLaravelApi()) {
+      return this.logoutViaLaravel();
+    }
+
     try {
       if (this.sessionToken) {
         // Remove session from Supabase
@@ -401,6 +410,10 @@ class AuthService {
 
   // Get all users (admin only)
   async getAllUsers(): Promise<User[]> {
+    if (useLaravelApi()) {
+      return this.getAllUsersViaLaravel();
+    }
+
     try {
       // First try to get from Supabase
       if (supabase) {
@@ -532,6 +545,10 @@ class AuthService {
 
   // Update user profile (first name, last name, email)
   async updateUserProfile(userId: number, firstName: string, lastName: string, email: string): Promise<{ success: boolean; message: string; user?: User }> {
+    if (useLaravelApi()) {
+      return this.updateProfileViaLaravel(firstName, lastName, email);
+    }
+
     try {
       const newUsername = `${firstName.trim().toLowerCase()}.${lastName.trim().toLowerCase()}`;
       
@@ -616,6 +633,10 @@ class AuthService {
 
   // Reset user password (admin only)
   async resetUserPassword(userId: number, newPassword: string): Promise<{ success: boolean; message: string }> {
+    if (useLaravelApi()) {
+      return this.resetPasswordViaLaravel(userId, newPassword);
+    }
+
     try {
       // First try to update in Supabase
       if (supabase) {
@@ -736,6 +757,10 @@ class AuthService {
   }
 
   async register(input: RegisterInput): Promise<RegisterResponse> {
+    if (useLaravelApi()) {
+      return this.registerViaLaravel(input);
+    }
+
     try {
       const username = `${input.firstName.trim().toLowerCase()}.${input.lastName.trim().toLowerCase()}`;
       const role: 'admin' | 'user' | 'moderator' = input.role || 'user';
@@ -909,6 +934,112 @@ class AuthService {
       return { success: errors === 0, migrated, skipped, errors, details };
     } catch (e) {
       return { success: false, migrated: 0, skipped: 0, errors: 1, details: [(e as Error).message] };
+    }
+  }
+
+  private async loginViaLaravel(credentials: LoginCredentials): Promise<AuthResponse> {
+    try {
+      const data = await apiFetch<AuthResponse>('/auth/login', {
+        method: 'POST',
+        body: JSON.stringify(credentials),
+      });
+
+      if (data.success && data.user && data.token) {
+        this.currentUser = data.user;
+        this.sessionToken = data.token;
+        localStorage.setItem('user', JSON.stringify(data.user));
+        localStorage.setItem('sessionToken', data.token);
+      }
+
+      return data;
+    } catch (error) {
+      return {
+        success: false,
+        message: error instanceof Error ? error.message : 'Login failed',
+      };
+    }
+  }
+
+  private async logoutViaLaravel(): Promise<AuthResponse> {
+    try {
+      if (this.sessionToken) {
+        await apiFetch('/auth/logout', { method: 'POST' });
+      }
+    } catch {
+      // Clear local session even if API call fails
+    }
+
+    this.currentUser = null;
+    this.sessionToken = null;
+    localStorage.removeItem('user');
+    localStorage.removeItem('sessionToken');
+
+    return { success: true, message: 'Logout successful' };
+  }
+
+  private async registerViaLaravel(input: RegisterInput): Promise<RegisterResponse> {
+    try {
+      return await apiFetch<RegisterResponse>('/auth/register', {
+        method: 'POST',
+        body: JSON.stringify(input),
+      });
+    } catch (error) {
+      return {
+        success: false,
+        message: error instanceof Error ? error.message : 'Registration failed',
+      };
+    }
+  }
+
+  private async getAllUsersViaLaravel(): Promise<User[]> {
+    try {
+      const data = await apiFetch<{ success: boolean; users: User[] }>('/admin/users');
+      return data.users ?? [];
+    } catch (error) {
+      console.error('Error fetching users from Laravel:', error);
+      return [];
+    }
+  }
+
+  private async updateProfileViaLaravel(
+    firstName: string,
+    lastName: string,
+    email: string
+  ): Promise<{ success: boolean; message: string; user?: User }> {
+    try {
+      const data = await apiFetch<{ success: boolean; message: string; user?: User }>('/auth/profile', {
+        method: 'PUT',
+        body: JSON.stringify({ firstName, lastName, email }),
+      });
+
+      if (data.success && data.user) {
+        this.currentUser = data.user;
+        localStorage.setItem('user', JSON.stringify(data.user));
+      }
+
+      return data;
+    } catch (error) {
+      return {
+        success: false,
+        message: error instanceof Error ? error.message : 'Failed to update profile',
+      };
+    }
+  }
+
+  private async resetPasswordViaLaravel(
+    userId: number,
+    newPassword: string
+  ): Promise<{ success: boolean; message: string }> {
+    try {
+      return await apiFetch(`/auth/reset-password/${userId}`, {
+        method: 'POST',
+        body: JSON.stringify({ password: newPassword }),
+      });
+    } catch (error) {
+      return {
+        success: false,
+        message: error instanceof Error ? error.message : 'Failed to reset password',
+      };
     }
   }
 }
